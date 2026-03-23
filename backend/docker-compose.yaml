@@ -1,0 +1,13 @@
+services:
+  mongo:
+    image: mongo:latest
+    container_name: communicator-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: communicatordb
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
