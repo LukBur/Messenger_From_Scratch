@@ -1,7 +1,11 @@
 package pl.communicator.backend.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
 
+@Setter
+@Getter
 public class LoginRequest {
 
     @NotBlank(message = "Login jest wymagany")
@@ -13,19 +17,4 @@ public class LoginRequest {
     public LoginRequest() {
     }
 
-    public String getLogin() {
-        return login;
-    }
-
-    public void setLogin(String login) {
-        this.login = login;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
 }

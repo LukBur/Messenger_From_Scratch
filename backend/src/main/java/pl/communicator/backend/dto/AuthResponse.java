@@ -1,5 +1,8 @@
 package pl.communicator.backend.dto;
 
+import lombok.Getter;
+
+@Getter
 public class AuthResponse {
 
     private String message;
@@ -11,7 +14,4 @@ public class AuthResponse {
         this.message = message;
     }
 
-    public String getMessage() {
-        return message;
-    }
 }
