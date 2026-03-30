@@ -2,6 +2,7 @@ package pl.communicator.backend.controller;
 
 import pl.communicator.backend.dto.AuthResponse;
 import pl.communicator.backend.dto.LoginRequest;
+import pl.communicator.backend.dto.LoginResponse;
 import pl.communicator.backend.dto.RegisterRequest;
 import pl.communicator.backend.service.AuthService;
 import jakarta.validation.Valid;
@@ -26,8 +27,8 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        String message = authService.login(request);
-        return new AuthResponse(message);
+    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
+        String token = authService.login(request);
+        return new LoginResponse(token);
     }
 }

@@ -7,6 +7,7 @@ import pl.communicator.backend.exception.UserAlreadyExistsException;
 import pl.communicator.backend.model.Role;
 import pl.communicator.backend.model.User;
 import pl.communicator.backend.repository.UserRepository;
+import pl.communicator.backend.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -15,19 +16,23 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     public String register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new UserAlreadyExistsException("Email jest juz zajety");
+            throw new UserAlreadyExistsException("Email is already taken");
         }
 
         if (userRepository.existsByLogin(request.getLogin())) {
-            throw new UserAlreadyExistsException("Login jest juz zajety");
+            throw new UserAlreadyExistsException("Login is already taken");
         }
 
         User user = new User();
@@ -40,19 +45,19 @@ public class AuthService {
 
         userRepository.save(user);
 
-        return "Rejestracja zakonczona sukcesem";
+        return "Registration successful";
     }
 
     public String login(LoginRequest request) {
         User user = userRepository.findByLogin(request.getLogin())
-                .orElseThrow(() -> new InvalidCredentialsException("Nieprawidlowy login lub haslo"));
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid login or password"));
 
         boolean passwordMatches = passwordEncoder.matches(request.getPassword(), user.getPassword());
 
         if (!passwordMatches) {
-            throw new InvalidCredentialsException("Nieprawidlowy login lub haslo");
+            throw new InvalidCredentialsException("Invalid login or password");
         }
 
-        return "Logowanie zakonczone sukcesem";
+        return jwtService.generateToken(user.getLogin());
     }
 }
