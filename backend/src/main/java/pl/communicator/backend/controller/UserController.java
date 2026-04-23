@@ -1,12 +1,16 @@
 package pl.communicator.backend.controller;
 
 import pl.communicator.backend.dto.UserResponse;
+import pl.communicator.backend.dto.UserSearchResponse;
 import pl.communicator.backend.model.User;
 import pl.communicator.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -33,5 +37,31 @@ public class UserController {
                 user.getRole().name(),
                 user.getAvatarUrl()
         );
+    }
+
+    @GetMapping("/search")
+    public List<UserSearchResponse> searchUsers(
+            @RequestParam String query,
+            Authentication authentication
+    ) {
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+
+        String currentLogin = authentication.getName();
+
+        List<User> users = userRepository
+                .findByLoginContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(query, query);
+
+        return users.stream()
+                .filter(user -> !user.getLogin().equals(currentLogin))
+                .map(user -> new UserSearchResponse(
+                        user.getId(),
+                        user.getLogin(),
+                        user.getDisplayName(),
+                        user.getAvatarUrl(),
+                        user.getRole().name()
+                ))
+                .toList();
     }
 }
