@@ -23,4 +23,11 @@ public class ConversationController {
     ) {
         return conversationService.createOrGetPrivateConversation(authentication.getName(), request);
     }
+
+    @GetMapping("/my")
+    public java.util.List<ConversationResponse> getMyConversations(
+            org.springframework.security.core.Authentication authentication
+    ) {
+        return conversationService.getMyConversations(authentication.getName());
+    }
 }

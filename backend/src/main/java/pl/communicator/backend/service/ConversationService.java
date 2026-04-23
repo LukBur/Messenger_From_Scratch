@@ -61,6 +61,17 @@ public class ConversationService {
         return mapToResponse(savedConversation);
     }
 
+    public List<ConversationResponse> getMyConversations(String currentLogin) {
+        User currentUser = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        List<Conversation> conversations = conversationRepository.findByParticipantIdsContaining(currentUser.getId());
+
+        return conversations.stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
     private ConversationResponse mapToResponse(Conversation conversation) {
         List<ConversationParticipantResponse> participants = conversation.getParticipantIds().stream()
                 .map(userId -> userRepository.findById(userId)
