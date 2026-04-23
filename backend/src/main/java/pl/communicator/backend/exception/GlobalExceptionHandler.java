@@ -32,4 +32,18 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new AuthResponse(message));
     }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<AuthResponse> handleResourceNotFound(ResourceNotFoundException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new AuthResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<AuthResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new AuthResponse(ex.getMessage()));
+    }
 }
