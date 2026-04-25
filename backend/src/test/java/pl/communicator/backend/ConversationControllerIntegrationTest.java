@@ -3,11 +3,9 @@ package pl.communicator.backend;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import pl.communicator.backend.model.Conversation;
-import pl.communicator.backend.model.ConversationType;
-import pl.communicator.backend.model.Role;
-import pl.communicator.backend.model.User;
+import pl.communicator.backend.model.*;
 import pl.communicator.backend.repository.ConversationRepository;
+import pl.communicator.backend.repository.MessageRepository;
 import pl.communicator.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,6 +40,9 @@ class ConversationControllerIntegrationTest {
     private ConversationRepository conversationRepository;
 
     @Autowired
+    private MessageRepository messageRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
@@ -49,6 +50,7 @@ class ConversationControllerIntegrationTest {
 
     @BeforeEach
     void clearDatabase() {
+        messageRepository.deleteAll();
         conversationRepository.deleteAll();
         userRepository.deleteAll();
     }
@@ -249,5 +251,103 @@ class ConversationControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].participants[*].login", not(empty())));
+    }
+
+    @Test
+    void shouldReturnConversationWithNullLastMessageWhenNoMessagesExist() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User currentUser = userRepository.findByLogin("janek123").orElseThrow();
+        User targetUser = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        Conversation conversation = new Conversation();
+        conversation.setType(ConversationType.PRIVATE);
+        conversation.setParticipantIds(List.of(currentUser.getId(), targetUser.getId()));
+        conversation.setCreatedBy(currentUser.getId());
+        conversation.setCreatedAt(Instant.now());
+        conversation.setLastActivityAt(conversation.getCreatedAt());
+        conversation.setLastMessageId(null);
+        conversationRepository.save(conversation);
+
+        mockMvc.perform(get("/api/conversations/my")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].lastMessage").doesNotExist())
+                .andExpect(jsonPath("$[0].lastActivityAt").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturnLastMessageAndLastActivityAtForConversation() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User currentUser = userRepository.findByLogin("janek123").orElseThrow();
+        User targetUser = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        Conversation conversation = new Conversation();
+        conversation.setType(ConversationType.PRIVATE);
+        conversation.setParticipantIds(List.of(currentUser.getId(), targetUser.getId()));
+        conversation.setCreatedBy(currentUser.getId());
+        conversation.setCreatedAt(Instant.now().minusSeconds(60));
+        conversation.setLastActivityAt(conversation.getCreatedAt());
+        conversation.setLastMessageId(null);
+        conversation = conversationRepository.save(conversation);
+
+        Message message = new Message();
+        message.setConversationId(conversation.getId());
+        message.setSenderId(currentUser.getId());
+        message.setContent("Hello Adam");
+        message.setCreatedAt(Instant.now());
+        message.setEdited(false);
+        message.setEditedAt(null);
+        message = messageRepository.save(message);
+
+        conversation.setLastActivityAt(message.getCreatedAt());
+        conversation.setLastMessageId(message.getId());
+        conversationRepository.save(conversation);
+
+        mockMvc.perform(get("/api/conversations/my")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].lastActivityAt").isNotEmpty())
+                .andExpect(jsonPath("$[0].lastMessage.content").value("Hello Adam"))
+                .andExpect(jsonPath("$[0].lastMessage.senderLogin").value("janek123"))
+                .andExpect(jsonPath("$[0].lastMessage.senderDisplayName").value("Janek"))
+                .andExpect(jsonPath("$[0].lastMessage.edited").value(false));
+    }
+
+    @Test
+    void shouldReturnConversationsSortedByLastActivityAtDescending() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User janek = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation olderConversation = new Conversation();
+        olderConversation.setType(ConversationType.PRIVATE);
+        olderConversation.setParticipantIds(List.of(janek.getId(), adam.getId()));
+        olderConversation.setCreatedBy(janek.getId());
+        olderConversation.setCreatedAt(Instant.now().minusSeconds(120));
+        olderConversation.setLastActivityAt(Instant.now().minusSeconds(60));
+        olderConversation.setLastMessageId(null);
+        olderConversation = conversationRepository.save(olderConversation);
+
+        Conversation newerConversation = new Conversation();
+        newerConversation.setType(ConversationType.PRIVATE);
+        newerConversation.setParticipantIds(List.of(janek.getId(), kasia.getId()));
+        newerConversation.setCreatedBy(janek.getId());
+        newerConversation.setCreatedAt(Instant.now().minusSeconds(100));
+        newerConversation.setLastActivityAt(Instant.now().minusSeconds(10));
+        newerConversation.setLastMessageId(null);
+        newerConversation = conversationRepository.save(newerConversation);
+
+        mockMvc.perform(get("/api/conversations/my")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].id").value(newerConversation.getId()))
+                .andExpect(jsonPath("$[1].id").value(olderConversation.getId()));
     }
 }
