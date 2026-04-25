@@ -1,13 +1,16 @@
 package pl.communicator.backend.service;
 
+import pl.communicator.backend.dto.ConversationLastMessageResponse;
 import pl.communicator.backend.dto.ConversationParticipantResponse;
 import pl.communicator.backend.dto.ConversationResponse;
 import pl.communicator.backend.dto.CreatePrivateConversationRequest;
 import pl.communicator.backend.exception.ResourceNotFoundException;
 import pl.communicator.backend.model.Conversation;
 import pl.communicator.backend.model.ConversationType;
+import pl.communicator.backend.model.Message;
 import pl.communicator.backend.model.User;
 import pl.communicator.backend.repository.ConversationRepository;
+import pl.communicator.backend.repository.MessageRepository;
 import pl.communicator.backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
@@ -19,11 +22,13 @@ public class ConversationService {
 
     private final ConversationRepository conversationRepository;
     private final UserRepository userRepository;
+    private final MessageRepository messageRepository;
 
     public ConversationService(ConversationRepository conversationRepository,
-                               UserRepository userRepository) {
+                               UserRepository userRepository, MessageRepository messageRepository) {
         this.conversationRepository = conversationRepository;
         this.userRepository = userRepository;
+        this.messageRepository = messageRepository;
     }
 
     public ConversationResponse createOrGetPrivateConversation(String currentLogin,
@@ -51,10 +56,15 @@ public class ConversationService {
         }
 
         Conversation conversation = new Conversation();
+
+        Instant now = Instant.now();
+
         conversation.setType(ConversationType.PRIVATE);
         conversation.setParticipantIds(List.of(currentUser.getId(), targetUser.getId()));
         conversation.setCreatedBy(currentUser.getId());
         conversation.setCreatedAt(Instant.now());
+        conversation.setLastActivityAt(now);
+        conversation.setLastMessageId(null);
 
         Conversation savedConversation = conversationRepository.save(conversation);
 
@@ -68,6 +78,11 @@ public class ConversationService {
         List<Conversation> conversations = conversationRepository.findByParticipantIdsContaining(currentUser.getId());
 
         return conversations.stream()
+                .sorted((a, b) -> {
+                    Instant aTime = a.getLastActivityAt() != null ? a.getLastActivityAt() : a.getCreatedAt();
+                    Instant bTime = b.getLastActivityAt() != null ? b.getLastActivityAt() : b.getCreatedAt();
+                    return bTime.compareTo(aTime);
+                })
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -84,12 +99,33 @@ public class ConversationService {
                         .orElseThrow(() -> new ResourceNotFoundException("Participant not found")))
                 .toList();
 
+        ConversationLastMessageResponse lastMessageResponse = null;
+
+        if (conversation.getLastMessageId() != null) {
+            Message lastMessage = messageRepository.findById(conversation.getLastMessageId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Last message not found"));
+
+            User sender = userRepository.findById(lastMessage.getSenderId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Sender not found"));
+
+            lastMessageResponse = new ConversationLastMessageResponse(
+                    lastMessage.getId(),
+                    lastMessage.getContent(),
+                    lastMessage.getCreatedAt(),
+                    lastMessage.isEdited(),
+                    sender.getLogin(),
+                    sender.getDisplayName()
+            );
+        }
+
         return new ConversationResponse(
                 conversation.getId(),
                 conversation.getType().name(),
                 participants,
                 conversation.getCreatedBy(),
-                conversation.getCreatedAt()
+                conversation.getCreatedAt(),
+                conversation.getLastActivityAt(),
+                lastMessageResponse
         );
     }
 }

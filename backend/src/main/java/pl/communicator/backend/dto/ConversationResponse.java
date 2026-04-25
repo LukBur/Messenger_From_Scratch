@@ -13,16 +13,22 @@ public class ConversationResponse {
     private List<ConversationParticipantResponse> participants;
     private String createdBy;
     private Instant createdAt;
+    private Instant lastActivityAt;
+    private ConversationLastMessageResponse lastMessage;
 
     public ConversationResponse() {
     }
 
-    public ConversationResponse(String id, String type, List<ConversationParticipantResponse> participants, String createdBy, Instant createdAt) {
+    public ConversationResponse(String id, String type, List<ConversationParticipantResponse> participants,
+                                String createdBy, Instant createdAt, Instant lastActivityAt,
+                                ConversationLastMessageResponse lastMessage) {
         this.id = id;
         this.type = type;
         this.participants = participants;
         this.createdBy = createdBy;
         this.createdAt = createdAt;
+        this.lastActivityAt = lastActivityAt;
+        this.lastMessage = lastMessage;
     }
 
 }

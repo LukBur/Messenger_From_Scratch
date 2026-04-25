@@ -56,6 +56,10 @@ public class MessageService {
 
         Message savedMessage = messageRepository.save(message);
 
+        conversation.setLastActivityAt(savedMessage.getCreatedAt());
+        conversation.setLastMessageId(savedMessage.getId());
+        conversationRepository.save(conversation);
+
         return mapToResponse(savedMessage);
     }
 

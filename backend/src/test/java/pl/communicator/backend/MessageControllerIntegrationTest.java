@@ -101,10 +101,15 @@ class MessageControllerIntegrationTest {
 
     private Conversation createPrivateConversation(User firstUser, User secondUser) {
         Conversation conversation = new Conversation();
+
+        Instant now = Instant.now();
+
         conversation.setType(ConversationType.PRIVATE);
         conversation.setParticipantIds(List.of(firstUser.getId(), secondUser.getId()));
         conversation.setCreatedBy(firstUser.getId());
         conversation.setCreatedAt(Instant.now());
+        conversation.setLastActivityAt(now);
+        conversation.setLastMessageId(null);
         return conversationRepository.save(conversation);
     }
 

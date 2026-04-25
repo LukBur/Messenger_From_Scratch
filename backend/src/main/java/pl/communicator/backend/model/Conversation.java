@@ -24,16 +24,23 @@ public class Conversation {
     private String createdBy;
     @Setter
     private Instant createdAt;
+    @Setter
+    private Instant lastActivityAt;
+    @Setter
+    private String lastMessageId;
 
     public Conversation() {
     }
 
-    public Conversation(String id, ConversationType type, List<String> participantIds, String createdBy, Instant createdAt) {
+    public Conversation(String id, ConversationType type, List<String> participantIds, String createdBy,
+                        Instant createdAt, Instant lastActivityAt, String lastMessageId) {
         this.id = id;
         this.type = type;
         this.participantIds = participantIds;
         this.createdBy = createdBy;
         this.createdAt = createdAt;
+        this.lastActivityAt = lastActivityAt;
+        this.lastMessageId = lastMessageId;
     }
 
 }

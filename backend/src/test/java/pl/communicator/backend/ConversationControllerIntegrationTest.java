@@ -193,10 +193,15 @@ class ConversationControllerIntegrationTest {
         User targetUser = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
 
         Conversation conversation = new Conversation();
+
+        Instant now = Instant.now();
+
         conversation.setType(ConversationType.PRIVATE);
         conversation.setParticipantIds(List.of(currentUser.getId(), targetUser.getId()));
         conversation.setCreatedBy(currentUser.getId());
         conversation.setCreatedAt(Instant.now());
+        conversation.setLastActivityAt(now);
+        conversation.setLastMessageId(null);
         conversationRepository.save(conversation);
 
         mockMvc.perform(get("/api/conversations/my")
@@ -216,17 +221,27 @@ class ConversationControllerIntegrationTest {
         User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
 
         Conversation myConversation = new Conversation();
+
+        Instant now = Instant.now();
+
         myConversation.setType(ConversationType.PRIVATE);
         myConversation.setParticipantIds(List.of(janek.getId(), adam.getId()));
         myConversation.setCreatedBy(janek.getId());
         myConversation.setCreatedAt(Instant.now());
+        myConversation.setLastActivityAt(now);
+        myConversation.setLastMessageId(null);
         conversationRepository.save(myConversation);
 
         Conversation otherConversation = new Conversation();
+
+        now = Instant.now();
+
         otherConversation.setType(ConversationType.PRIVATE);
         otherConversation.setParticipantIds(List.of(adam.getId(), kasia.getId()));
         otherConversation.setCreatedBy(adam.getId());
         otherConversation.setCreatedAt(Instant.now());
+        otherConversation.setLastActivityAt(now);
+        otherConversation.setLastMessageId(null);
         conversationRepository.save(otherConversation);
 
         mockMvc.perform(get("/api/conversations/my")
