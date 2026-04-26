@@ -31,6 +31,7 @@ public class ConversationService {
         this.messageRepository = messageRepository;
     }
 
+    // Creates a private conversation or returns an existing one for the same two users.
     public ConversationResponse createOrGetPrivateConversation(String currentLogin,
                                                                CreatePrivateConversationRequest request) {
         User currentUser = userRepository.findByLogin(currentLogin)
@@ -45,6 +46,7 @@ public class ConversationService {
 
         List<Conversation> privateConversations = conversationRepository.findByType(ConversationType.PRIVATE);
 
+        // Prevents creating duplicate private conversations between the same users.
         for (Conversation conversation : privateConversations) {
             List<String> participantIds = conversation.getParticipantIds();
 
@@ -62,7 +64,7 @@ public class ConversationService {
         conversation.setType(ConversationType.PRIVATE);
         conversation.setParticipantIds(List.of(currentUser.getId(), targetUser.getId()));
         conversation.setCreatedBy(currentUser.getId());
-        conversation.setCreatedAt(Instant.now());
+        conversation.setCreatedAt(now);
         conversation.setLastActivityAt(now);
         conversation.setLastMessageId(null);
 
@@ -71,6 +73,7 @@ public class ConversationService {
         return mapToResponse(savedConversation);
     }
 
+    // Returns all conversations of the current user, ordered by recent activity.
     public List<ConversationResponse> getMyConversations(String currentLogin) {
         User currentUser = userRepository.findByLogin(currentLogin)
                 .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
@@ -79,6 +82,7 @@ public class ConversationService {
 
         return conversations.stream()
                 .sorted((a, b) -> {
+                    // If there is no last activity date, the creation date is used as a fallback.
                     Instant aTime = a.getLastActivityAt() != null ? a.getLastActivityAt() : a.getCreatedAt();
                     Instant bTime = b.getLastActivityAt() != null ? b.getLastActivityAt() : b.getCreatedAt();
                     return bTime.compareTo(aTime);
@@ -87,6 +91,7 @@ public class ConversationService {
                 .toList();
     }
 
+    // Converts the conversation entity into a response object used by the API.
     private ConversationResponse mapToResponse(Conversation conversation) {
         List<ConversationParticipantResponse> participants = conversation.getParticipantIds().stream()
                 .map(userId -> userRepository.findById(userId)
@@ -101,6 +106,7 @@ public class ConversationService {
 
         ConversationLastMessageResponse lastMessageResponse = null;
 
+        // Adds last message data only when the conversation already has at least one message.
         if (conversation.getLastMessageId() != null) {
             Message lastMessage = messageRepository.findById(conversation.getLastMessageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Last message not found"));

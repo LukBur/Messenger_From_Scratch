@@ -9,17 +9,17 @@ import lombok.Setter;
 @Getter
 public class RegisterRequest {
 
-    @Email(message = "Niepoprawny email")
-    @NotBlank(message = "Email jest wymagany")
+    @Email(message = "Invalid email address")
+    @NotBlank(message = "Email is required")
     private String email;
 
-    @NotBlank(message = "Login jest wymagany")
+    @NotBlank(message = "Login is required")
     private String login;
 
-    @NotBlank(message = "Display name jest wymagany")
+    @NotBlank(message = "Display name is required")
     private String displayName;
 
-    @NotBlank(message = "Haslo jest wymagane")
+    @NotBlank(message = "Password is required")
     private String password;
 
     public RegisterRequest() {

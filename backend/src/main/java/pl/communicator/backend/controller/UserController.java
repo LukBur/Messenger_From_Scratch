@@ -22,6 +22,7 @@ public class UserController {
         this.userRepository = userRepository;
     }
 
+    // Returns profile data of the currently authenticated user.
     @GetMapping("/me")
     public UserResponse me(Authentication authentication) {
         String login = authentication.getName();
@@ -39,11 +40,13 @@ public class UserController {
         );
     }
 
+    // Searches users by login or display name.
     @GetMapping("/search")
     public List<UserSearchResponse> searchUsers(
             @RequestParam String query,
             Authentication authentication
     ) {
+        // Empty queries are ignored to avoid returning unnecessary results.
         if (query == null || query.trim().isEmpty()) {
             return List.of();
         }
@@ -54,6 +57,7 @@ public class UserController {
                 .findByLoginContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(query, query);
 
         return users.stream()
+                // The current user is removed from search results.
                 .filter(user -> !user.getLogin().equals(currentLogin))
                 .map(user -> new UserSearchResponse(
                         user.getId(),

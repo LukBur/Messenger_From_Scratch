@@ -8,10 +8,10 @@ import lombok.Setter;
 @Getter
 public class LoginRequest {
 
-    @NotBlank(message = "Login jest wymagany")
+    @NotBlank(message = "Login is required")
     private String login;
 
-    @NotBlank(message = "Haslo jest wymagane")
+    @NotBlank(message = "Password is required")
     private String password;
 
     public LoginRequest() {

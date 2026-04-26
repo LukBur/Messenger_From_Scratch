@@ -19,6 +19,7 @@ public class MessageController {
         this.messageService = messageService;
     }
 
+    // Sends a new message as the currently authenticated user.
     @PostMapping("/messages")
     public MessageResponse sendMessage(
             @Valid @RequestBody SendMessageRequest request,
@@ -27,6 +28,7 @@ public class MessageController {
         return messageService.sendMessage(authentication.getName(), request);
     }
 
+    // Returns messages from a selected conversation, only for the authenticated user.
     @GetMapping("/conversations/{conversationId}/messages")
     public List<MessageResponse> getConversationMessages(
             @PathVariable String conversationId,

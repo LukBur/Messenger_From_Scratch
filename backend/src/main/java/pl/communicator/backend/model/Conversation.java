@@ -18,14 +18,23 @@ public class Conversation {
 
     @Setter
     private ConversationType type;
+
+    // Stores ids of users who are members of this conversation.
     @Setter
     private List<String> participantIds;
+
+    // Id of the user who created the conversation.
     @Setter
     private String createdBy;
+
     @Setter
     private Instant createdAt;
+
+    // Used for sorting conversations by the newest activity.
     @Setter
     private Instant lastActivityAt;
+
+    // Stores the id of the latest message for quick conversation previews.
     @Setter
     private String lastMessageId;
 

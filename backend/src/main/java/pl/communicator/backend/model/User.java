@@ -14,14 +14,24 @@ public class User {
 
     @Setter
     private String email;
+
+    // Unique username used for login and identifying users in the application.
     @Setter
     private String login;
+
+    // Public name displayed in conversations and search results.
     @Setter
     private String displayName;
+
+    // Stores the hashed password, not the plain text value.
     @Setter
     private String password;
+
+    // Defines the user's permissions in the application.
     @Setter
     private Role role;
+
+    // Optional URL to the user's profile image.
     @Setter
     private String avatarUrl;
 

@@ -19,11 +19,13 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
+    // Builds the signing key from the Base64 secret stored in application configuration.
     private SecretKey getSignInKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
+    // Creates a JWT token with the user's login as the subject.
     public String generateToken(String login) {
         return Jwts.builder()
                 .subject(login)
@@ -33,19 +35,23 @@ public class JwtService {
                 .compact();
     }
 
+    // Reads the login stored as the token subject.
     public String extractLogin(String token) {
         return extractAllClaims(token).getSubject();
     }
 
+    // Checks whether the token belongs to the given user and is still active.
     public boolean isTokenValid(String token, String login) {
         final String extractedLogin = extractLogin(token);
         return extractedLogin.equals(login) && !isTokenExpired(token);
     }
 
+    // Verifies if the token expiration date is already in the past.
     private boolean isTokenExpired(String token) {
         return extractAllClaims(token).getExpiration().before(new Date());
     }
 
+    // Parses and verifies all claims from the signed JWT token.
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSignInKey())

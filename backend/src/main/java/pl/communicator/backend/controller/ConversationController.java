@@ -16,14 +16,17 @@ public class ConversationController {
         this.conversationService = conversationService;
     }
 
+    // Creates a private conversation or returns the existing one between the same users.
     @PostMapping("/private")
     public ConversationResponse createOrGetPrivateConversation(
             @Valid @RequestBody CreatePrivateConversationRequest request,
             org.springframework.security.core.Authentication authentication
     ) {
+        // The authenticated username is taken from the JWT processed by Spring Security.
         return conversationService.createOrGetPrivateConversation(authentication.getName(), request);
     }
 
+    // Returns all conversations that belong to the currently authenticated user.
     @GetMapping("/my")
     public java.util.List<ConversationResponse> getMyConversations(
             org.springframework.security.core.Authentication authentication

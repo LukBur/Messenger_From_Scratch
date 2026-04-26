@@ -37,17 +37,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String login;
 
+        // Requests without a Bearer token are passed further without setting authentication.
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        // Extracts the JWT value from the Authorization header.
         jwt = authHeader.substring(7);
         login = jwtService.extractLogin(jwt);
 
+        // Authentication is set only if the token contains a login and the user is not already authenticated.
         if (login != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(login);
 
+            // The token must match the loaded user before Spring Security accepts the request.
             if (jwtService.isTokenValid(jwt, userDetails.getUsername())) {
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(
@@ -56,6 +60,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 userDetails.getAuthorities()
                         );
 
+                // Adds request-specific details and stores authentication in the security context.
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }

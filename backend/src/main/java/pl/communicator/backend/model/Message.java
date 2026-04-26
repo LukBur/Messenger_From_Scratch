@@ -14,16 +14,25 @@ public class Message {
     @Id
     private String id;
 
+    // Id of the conversation that this message belongs to.
     @Setter
     private String conversationId;
+
+    // Id of the user who sent the message.
     @Setter
     private String senderId;
+
     @Setter
     private String content;
+
     @Setter
     private Instant createdAt;
+
+    // Indicates whether the message content was changed after sending.
     @Setter
     private boolean edited;
+
+    // Stores the time of the last edit, if the message was modified.
     @Setter
     private Instant editedAt;
 
