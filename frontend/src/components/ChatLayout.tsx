@@ -15,6 +15,7 @@ type ChatLayoutProps = {
   onSearchUsers: (query: string) => Promise<void>;
   onStartConversation: (userId: string) => Promise<void>;
   onSelectConversation: (conversation: ConversationResponse) => void;
+  onRefreshConversations: () => Promise<void>;
   onLogout: () => void;
 };
 
@@ -27,6 +28,7 @@ export default function ChatLayout({
   onSearchUsers,
   onStartConversation,
   onSelectConversation,
+  onRefreshConversations,
   onLogout,
 }: ChatLayoutProps) {
   return (
@@ -63,6 +65,7 @@ export default function ChatLayout({
           <ConversationView
             conversation={selectedConversation}
             currentUser={currentUser}
+            onConversationUpdated={onRefreshConversations}
           />
         </div>
       </div>

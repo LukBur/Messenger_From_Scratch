@@ -14,6 +14,6 @@ export type LoginResponse = {
   token: string;
 };
 
-export type MessageResponse = {
+export type ApiMessageResponse  = {
   message: string;
 };

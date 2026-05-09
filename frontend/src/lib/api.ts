@@ -1,6 +1,7 @@
-import { LoginRequest, LoginResponse, MessageResponse, RegisterRequest } from "@/types/auth";
+import { LoginRequest, LoginResponse, ApiMessageResponse, RegisterRequest } from "@/types/auth";
 import { UserSearchResponse, UserResponse } from "@/types/user";
 import { ConversationResponse } from "@/types/conversation";
+import { MessageResponse, SendMessageRequest } from "@/types/message";
 
 const API_URL = "http://localhost:8080/api";
 
@@ -30,7 +31,7 @@ export async function loginUser(payload: LoginRequest): Promise<LoginResponse> {
 
 export async function registerUser(
   payload: RegisterRequest
-): Promise<MessageResponse> {
+): Promise<ApiMessageResponse> {
   const response = await fetch(`${API_URL}/auth/register`, {
     method: "POST",
     headers: {
@@ -39,7 +40,7 @@ export async function registerUser(
     body: JSON.stringify(payload),
   });
 
-  return handleJsonResponse<MessageResponse>(response);
+  return handleJsonResponse<ApiMessageResponse>(response);
 }
 
 export async function getCurrentUser(token: string): Promise<UserResponse> {
@@ -96,4 +97,36 @@ export async function getMyConversations(
   });
 
   return handleJsonResponse<ConversationResponse[]>(response);
+}
+
+export async function getConversationMessages(
+  token: string,
+  conversationId: string
+): Promise<MessageResponse[]> {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/messages`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  return handleJsonResponse<MessageResponse[]>(response);
+}
+
+export async function sendMessage(
+  token: string,
+  payload: SendMessageRequest
+): Promise<MessageResponse> {
+  const response = await fetch(`${API_URL}/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return handleJsonResponse<MessageResponse>(response);
 }

@@ -29,13 +29,33 @@ export default function HomePage() {
   const [selectedConversation, setSelectedConversation] =
     useState<ConversationResponse | null>(null);
 
-  const loadConversations = async (token: string) => {
+  const loadConversations = async (
+    token: string,
+    preferredConversationId?: string
+  ) => {
     const data = await getMyConversations(token);
     setConversations(data);
 
-    if (data.length > 0 && !selectedConversation) {
+    if (data.length === 0) {
+      setSelectedConversation(null);
+      return;
+    }
+
+    const targetId = preferredConversationId || selectedConversation?.id;
+    const matchedConversation = data.find((item) => item.id === targetId);
+
+    if (matchedConversation) {
+      setSelectedConversation(matchedConversation);
+    } else {
       setSelectedConversation(data[0]);
     }
+  };
+
+  const refreshConversations = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    await loadConversations(token);
   };
 
   const fetchCurrentUser = async (token: string) => {
@@ -119,8 +139,7 @@ export default function HomePage() {
     try {
       setMessage("");
       const conversation = await createPrivateConversation(token, userId);
-      await loadConversations(token);
-      setSelectedConversation(conversation);
+      await loadConversations(token, conversation.id);
       setSearchResults([]);
     } catch (error) {
       setMessage(
@@ -174,6 +193,7 @@ export default function HomePage() {
               onSearchUsers={handleSearchUsers}
               onStartConversation={handleStartConversation}
               onSelectConversation={setSelectedConversation}
+              onRefreshConversations={refreshConversations}
               onLogout={handleLogout}
             />
             {message && <p className="status-message">{message}</p>}
