@@ -2,9 +2,17 @@
 
 import { useEffect, useState } from "react";
 import AuthForm from "@/components/AuthForm";
-import UserPanel from "@/components/UserPanel";
-import { getCurrentUser, loginUser, registerUser } from "@/lib/api";
-import { UserResponse } from "@/types/user";
+import ChatLayout from "@/components/ChatLayout";
+import {
+  createPrivateConversation,
+  getCurrentUser,
+  getMyConversations,
+  loginUser,
+  registerUser,
+  searchUsers,
+} from "@/lib/api";
+import { ConversationResponse } from "@/types/conversation";
+import { UserSearchResponse, UserResponse } from "@/types/user";
 
 type AuthMode = "login" | "register";
 
@@ -13,17 +21,35 @@ export default function HomePage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingUser, setLoadingUser] = useState(true);
+
   const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
+  const [searchResults, setSearchResults] = useState<UserSearchResponse[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [conversations, setConversations] = useState<ConversationResponse[]>([]);
+  const [selectedConversation, setSelectedConversation] =
+    useState<ConversationResponse | null>(null);
+
+  const loadConversations = async (token: string) => {
+    const data = await getMyConversations(token);
+    setConversations(data);
+
+    if (data.length > 0 && !selectedConversation) {
+      setSelectedConversation(data[0]);
+    }
+  };
 
   const fetchCurrentUser = async (token: string) => {
     try {
       setLoadingUser(true);
       const user = await getCurrentUser(token);
       setCurrentUser(user);
+      await loadConversations(token);
       setMessage("");
     } catch (error) {
       localStorage.removeItem("token");
       setCurrentUser(null);
+      setConversations([]);
+      setSelectedConversation(null);
       setMessage(
         error instanceof Error ? error.message : "Could not load user data"
       );
@@ -71,9 +97,44 @@ export default function HomePage() {
     }
   };
 
+  const handleSearchUsers = async (query: string) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setSearchLoading(true);
+      const users = await searchUsers(token, query);
+      setSearchResults(users);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Search failed");
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleStartConversation = async (userId: string) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setMessage("");
+      const conversation = await createPrivateConversation(token, userId);
+      await loadConversations(token);
+      setSelectedConversation(conversation);
+      setSearchResults([]);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not create conversation"
+      );
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     setCurrentUser(null);
+    setSearchResults([]);
+    setConversations([]);
+    setSelectedConversation(null);
     setMessage("Logged out");
     setMode("login");
   };
@@ -103,7 +164,20 @@ export default function HomePage() {
     <main className="page-wrapper">
       <div className="page-container">
         {currentUser ? (
-          <UserPanel user={currentUser} onLogout={handleLogout} />
+          <>
+            <ChatLayout
+              currentUser={currentUser}
+              searchResults={searchResults}
+              searchLoading={searchLoading}
+              conversations={conversations}
+              selectedConversation={selectedConversation}
+              onSearchUsers={handleSearchUsers}
+              onStartConversation={handleStartConversation}
+              onSelectConversation={setSelectedConversation}
+              onLogout={handleLogout}
+            />
+            {message && <p className="status-message">{message}</p>}
+          </>
         ) : (
           <AuthForm
             mode={mode}

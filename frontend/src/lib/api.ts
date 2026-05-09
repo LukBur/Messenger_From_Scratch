@@ -1,5 +1,6 @@
 import { LoginRequest, LoginResponse, MessageResponse, RegisterRequest } from "@/types/auth";
-import { UserResponse } from "@/types/user";
+import { UserSearchResponse, UserResponse } from "@/types/user";
+import { ConversationResponse } from "@/types/conversation";
 
 const API_URL = "http://localhost:8080/api";
 
@@ -49,4 +50,50 @@ export async function getCurrentUser(token: string): Promise<UserResponse> {
   });
 
   return handleJsonResponse<UserResponse>(response);
+}
+
+export async function searchUsers(
+  token: string,
+  query: string
+): Promise<UserSearchResponse[]> {
+  const response = await fetch(
+    `${API_URL}/users/search?query=${encodeURIComponent(query)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  return handleJsonResponse<UserSearchResponse[]>(response);
+}
+
+export async function createPrivateConversation(
+  token: string,
+  targetUserId: string
+): Promise<ConversationResponse> {
+  const response = await fetch(`${API_URL}/conversations/private`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      targetUserId,
+    }),
+  });
+
+  return handleJsonResponse<ConversationResponse>(response);
+}
+
+export async function getMyConversations(
+  token: string
+): Promise<ConversationResponse[]> {
+  const response = await fetch(`${API_URL}/conversations/my`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return handleJsonResponse<ConversationResponse[]>(response);
 }

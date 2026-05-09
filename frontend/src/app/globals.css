@@ -183,3 +183,141 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+.chat-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.chat-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px 24px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.chat-title {
+  margin: 0;
+}
+
+.chat-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 20px;
+}
+
+.chat-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.chat-content {
+  min-width: 0;
+}
+
+.sidebar-card,
+.content-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.section-title {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.search-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-form input {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.search-results,
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.search-user-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #f9fafb;
+}
+
+.conversation-item {
+  border: none;
+  width: 100%;
+  text-align: left;
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+}
+
+.conversation-item.active {
+  background: #e5e7eb;
+}
+
+.conversation-item-top {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.conversation-login {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.conversation-preview {
+  margin: 10px 0 0;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.conversation-header {
+  margin-bottom: 24px;
+}
+
+.conversation-placeholder {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.message-preview-card {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.message-preview-card p {
+  margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .chat-grid {
+    grid-template-columns: 1fr;
+  }
+}
