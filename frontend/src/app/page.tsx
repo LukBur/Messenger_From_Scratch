@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AuthForm from "@/components/AuthForm";
 import ChatLayout from "@/components/ChatLayout";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import { ConversationResponse } from "@/types/conversation";
 import { UserSearchResponse, UserResponse } from "@/types/user";
+import { connectStompClient, disconnectStompClient } from "@/lib/websocket";
 
 type AuthMode = "login" | "register";
 
@@ -29,54 +30,68 @@ export default function HomePage() {
   const [selectedConversation, setSelectedConversation] =
     useState<ConversationResponse | null>(null);
 
-  const loadConversations = async (
-    token: string,
-    preferredConversationId?: string
-  ) => {
-    const data = await getMyConversations(token);
-    setConversations(data);
+  const loadConversations = useCallback(
+    async (token: string, preferredConversationId?: string) => {
+      const data = await getMyConversations(token);
+      setConversations(data);
 
-    if (data.length === 0) {
-      setSelectedConversation(null);
-      return;
-    }
+      if (data.length === 0) {
+        setSelectedConversation(null);
+        return;
+      }
 
-    const targetId = preferredConversationId || selectedConversation?.id;
-    const matchedConversation = data.find((item) => item.id === targetId);
+      const targetId = preferredConversationId || selectedConversation?.id;
+      const matchedConversation = data.find((item) => item.id === targetId);
 
-    if (matchedConversation) {
-      setSelectedConversation(matchedConversation);
-    } else {
-      setSelectedConversation(data[0]);
-    }
-  };
+      if (matchedConversation) {
+        setSelectedConversation(matchedConversation);
+      } else {
+        setSelectedConversation(data[0]);
+      }
+    },
+    [selectedConversation?.id]
+  );
 
-  const refreshConversations = async () => {
+  const refreshConversations = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
     await loadConversations(token);
-  };
+  }, [loadConversations]);
 
-  const fetchCurrentUser = async (token: string) => {
-    try {
-      setLoadingUser(true);
-      const user = await getCurrentUser(token);
-      setCurrentUser(user);
-      await loadConversations(token);
-      setMessage("");
-    } catch (error) {
-      localStorage.removeItem("token");
-      setCurrentUser(null);
-      setConversations([]);
-      setSelectedConversation(null);
-      setMessage(
-        error instanceof Error ? error.message : "Could not load user data"
-      );
-    } finally {
-      setLoadingUser(false);
-    }
-  };
+  const fetchCurrentUser = useCallback(
+    async (token: string) => {
+      try {
+        setLoadingUser(true);
+
+        const user = await getCurrentUser(token);
+        setCurrentUser(user);
+
+        await loadConversations(token);
+        setMessage("");
+
+        connectStompClient(
+          () => {
+            console.log("WebSocket connected");
+          },
+          (error) => {
+            console.error(error);
+          }
+        );
+      } catch (error) {
+        localStorage.removeItem("token");
+        setCurrentUser(null);
+        setConversations([]);
+        setSelectedConversation(null);
+        setMessage(
+          error instanceof Error ? error.message : "Could not load user data"
+        );
+      } finally {
+        setLoadingUser(false);
+      }
+    },
+    [loadConversations]
+  );
 
   const handleLogin = async (payload: {
     login: string;
@@ -123,6 +138,8 @@ export default function HomePage() {
 
     try {
       setSearchLoading(true);
+      setMessage("");
+
       const users = await searchUsers(token, query);
       setSearchResults(users);
     } catch (error) {
@@ -138,6 +155,7 @@ export default function HomePage() {
 
     try {
       setMessage("");
+
       const conversation = await createPrivateConversation(token, userId);
       await loadConversations(token, conversation.id);
       setSearchResults([]);
@@ -150,6 +168,8 @@ export default function HomePage() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    disconnectStompClient();
+
     setCurrentUser(null);
     setSearchResults([]);
     setConversations([]);
@@ -166,8 +186,12 @@ export default function HomePage() {
       return;
     }
 
-    fetchCurrentUser(savedToken);
-  }, []);
+    void fetchCurrentUser(savedToken);
+
+    return () => {
+      disconnectStompClient();
+    };
+  }, [fetchCurrentUser]);
 
   if (loadingUser) {
     return (

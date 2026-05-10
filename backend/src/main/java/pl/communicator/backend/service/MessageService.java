@@ -1,5 +1,6 @@
 package pl.communicator.backend.service;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import pl.communicator.backend.dto.MessageResponse;
 import pl.communicator.backend.dto.MessageSenderResponse;
 import pl.communicator.backend.dto.SendMessageRequest;
@@ -21,13 +22,16 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
     private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public MessageService(MessageRepository messageRepository,
                           ConversationRepository conversationRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          SimpMessagingTemplate messagingTemplate) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
         this.userRepository = userRepository;
+        this.messagingTemplate = messagingTemplate;
     }
 
     // Sends a message only if the current user belongs to the selected conversation.
@@ -63,7 +67,14 @@ public class MessageService {
         conversation.setLastMessageId(savedMessage.getId());
         conversationRepository.save(conversation);
 
-        return mapToResponse(savedMessage);
+        MessageResponse response = mapToResponse(savedMessage);
+
+        messagingTemplate.convertAndSend(
+                "/topic/conversations/" + conversation.getId(),
+                response
+        );
+
+        return response;
     }
 
     // Returns messages from a conversation after checking that the user has access to it.

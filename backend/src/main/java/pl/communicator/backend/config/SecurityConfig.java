@@ -35,7 +35,13 @@ public class SecurityConfig {
 
                 // Authentication endpoints are public, while all other API endpoints require a valid token.
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/test", "/api/auth/register", "/api/auth/login").permitAll()
+                        .requestMatchers(
+                                "/api/test",
+                                "/api/auth/register",
+                                "/api/auth/login",
+                                "/ws",
+                                "/ws/**"
+                        ).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
@@ -60,6 +66,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

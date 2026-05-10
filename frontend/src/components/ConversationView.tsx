@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { StompSubscription } from "@stomp/stompjs";
+import { subscribeToConversation } from "@/lib/websocket";
 import { ConversationResponse } from "@/types/conversation";
 import { UserResponse } from "@/types/user";
 import { MessageResponse } from "@/types/message";
@@ -35,6 +37,8 @@ export default function ConversationView({
   const [sendingMessage, setSendingMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  const subscriptionRef = useRef<StompSubscription | null>(null);
+
   const loadMessages = async (conversationId: string) => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -42,6 +46,7 @@ export default function ConversationView({
     try {
       setLoadingMessages(true);
       setErrorMessage("");
+
       const data = await getConversationMessages(token, conversationId);
       setMessages(data);
     } catch (error) {
@@ -63,12 +68,17 @@ export default function ConversationView({
       setSendingMessage(true);
       setErrorMessage("");
 
-      await sendMessage(token, {
+      const sentMessage = await sendMessage(token, {
         conversationId: conversation.id,
         content,
       });
 
-      await loadMessages(conversation.id);
+      setMessages((prev) => {
+        const exists = prev.some((msg) => msg.id === sentMessage.id);
+        if (exists) return prev;
+        return [...prev, sentMessage];
+      });
+
       await onConversationUpdated();
     } catch (error) {
       setErrorMessage(
@@ -85,8 +95,53 @@ export default function ConversationView({
       return;
     }
 
-    loadMessages(conversation.id);
+    void loadMessages(conversation.id);
   }, [conversation?.id]);
+
+  useEffect(() => {
+    if (!conversation) {
+      return;
+    }
+
+    if (subscriptionRef.current) {
+      subscriptionRef.current.unsubscribe();
+      subscriptionRef.current = null;
+    }
+
+    let isCancelled = false;
+
+    const setupSubscription = async () => {
+      const subscription = await subscribeToConversation(
+        conversation.id,
+        (incomingMessage) => {
+          setMessages((prev) => {
+            const exists = prev.some((msg) => msg.id === incomingMessage.id);
+            if (exists) return prev;
+            return [...prev, incomingMessage];
+          });
+
+          void onConversationUpdated();
+        }
+      );
+
+      if (!isCancelled) {
+        subscriptionRef.current = subscription;
+      } else {
+        subscription?.unsubscribe();
+      }
+    };
+
+    void setupSubscription();
+
+    return () => {
+      isCancelled = true;
+
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
+    };
+  }, [conversation?.id, onConversationUpdated]);
 
   if (!conversation) {
     return (
