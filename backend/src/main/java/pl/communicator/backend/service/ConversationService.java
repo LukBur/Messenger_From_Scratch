@@ -1,5 +1,8 @@
 package pl.communicator.backend.service;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+import pl.communicator.backend.dto.ConversationCreatedEvent;
 import pl.communicator.backend.dto.ConversationLastMessageResponse;
 import pl.communicator.backend.dto.ConversationParticipantResponse;
 import pl.communicator.backend.dto.ConversationResponse;
@@ -12,7 +15,6 @@ import pl.communicator.backend.model.User;
 import pl.communicator.backend.repository.ConversationRepository;
 import pl.communicator.backend.repository.MessageRepository;
 import pl.communicator.backend.repository.UserRepository;
-import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
@@ -23,12 +25,16 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public ConversationService(ConversationRepository conversationRepository,
-                               UserRepository userRepository, MessageRepository messageRepository) {
+                               UserRepository userRepository,
+                               MessageRepository messageRepository,
+                               SimpMessagingTemplate messagingTemplate) {
         this.conversationRepository = conversationRepository;
         this.userRepository = userRepository;
         this.messageRepository = messageRepository;
+        this.messagingTemplate = messagingTemplate;
     }
 
     // Creates a private conversation or returns an existing one for the same two users.
@@ -57,10 +63,9 @@ public class ConversationService {
             }
         }
 
-        Conversation conversation = new Conversation();
-
         Instant now = Instant.now();
 
+        Conversation conversation = new Conversation();
         conversation.setType(ConversationType.PRIVATE);
         conversation.setParticipantIds(List.of(currentUser.getId(), targetUser.getId()));
         conversation.setCreatedBy(currentUser.getId());
@@ -69,6 +74,21 @@ public class ConversationService {
         conversation.setLastMessageId(null);
 
         Conversation savedConversation = conversationRepository.save(conversation);
+
+        ConversationCreatedEvent event = new ConversationCreatedEvent(
+                savedConversation.getId(),
+                savedConversation.getType().name()
+        );
+
+        messagingTemplate.convertAndSend(
+                "/topic/users/" + currentUser.getId() + "/conversations",
+                event
+        );
+
+        messagingTemplate.convertAndSend(
+                "/topic/users/" + targetUser.getId() + "/conversations",
+                event
+        );
 
         return mapToResponse(savedConversation);
     }

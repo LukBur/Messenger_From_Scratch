@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { StompSubscription } from "@stomp/stompjs";
 import AuthForm from "@/components/AuthForm";
 import ChatLayout from "@/components/ChatLayout";
 import {
@@ -13,7 +14,11 @@ import {
 } from "@/lib/api";
 import { ConversationResponse } from "@/types/conversation";
 import { UserSearchResponse, UserResponse } from "@/types/user";
-import { connectStompClient, disconnectStompClient } from "@/lib/websocket";
+import {
+  connectStompClient,
+  disconnectStompClient,
+  subscribeToConversationUpdates,
+} from "@/lib/websocket";
 
 type AuthMode = "login" | "register";
 
@@ -30,6 +35,15 @@ export default function HomePage() {
   const [selectedConversation, setSelectedConversation] =
     useState<ConversationResponse | null>(null);
 
+  const conversationUpdatesSubscriptionRef =
+    useRef<StompSubscription | null>(null);
+
+  const selectedConversationIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversation?.id ?? null;
+  }, [selectedConversation?.id]);
+
   const loadConversations = useCallback(
     async (token: string, preferredConversationId?: string) => {
       const data = await getMyConversations(token);
@@ -40,7 +54,9 @@ export default function HomePage() {
         return;
       }
 
-      const targetId = preferredConversationId || selectedConversation?.id;
+      const targetId =
+        preferredConversationId ?? selectedConversationIdRef.current;
+
       const matchedConversation = data.find((item) => item.id === targetId);
 
       if (matchedConversation) {
@@ -49,7 +65,7 @@ export default function HomePage() {
         setSelectedConversation(data[0]);
       }
     },
-    [selectedConversation?.id]
+    []
   );
 
   const refreshConversations = useCallback(async () => {
@@ -71,8 +87,22 @@ export default function HomePage() {
         setMessage("");
 
         connectStompClient(
-          () => {
+          async () => {
             console.log("WebSocket connected");
+
+            if (conversationUpdatesSubscriptionRef.current) {
+              conversationUpdatesSubscriptionRef.current.unsubscribe();
+              conversationUpdatesSubscriptionRef.current = null;
+            }
+
+            const subscription = await subscribeToConversationUpdates(
+              user.id,
+              () => {
+                void refreshConversations();
+              }
+            );
+
+            conversationUpdatesSubscriptionRef.current = subscription;
           },
           (error) => {
             console.error(error);
@@ -90,7 +120,7 @@ export default function HomePage() {
         setLoadingUser(false);
       }
     },
-    [loadConversations]
+    [loadConversations, refreshConversations]
   );
 
   const handleLogin = async (payload: {
@@ -167,6 +197,11 @@ export default function HomePage() {
   };
 
   const handleLogout = () => {
+    if (conversationUpdatesSubscriptionRef.current) {
+      conversationUpdatesSubscriptionRef.current.unsubscribe();
+      conversationUpdatesSubscriptionRef.current = null;
+    }
+
     localStorage.removeItem("token");
     disconnectStompClient();
 
@@ -189,9 +224,24 @@ export default function HomePage() {
     void fetchCurrentUser(savedToken);
 
     return () => {
+      if (conversationUpdatesSubscriptionRef.current) {
+        conversationUpdatesSubscriptionRef.current.unsubscribe();
+        conversationUpdatesSubscriptionRef.current = null;
+      }
+
       disconnectStompClient();
     };
   }, [fetchCurrentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const interval = setInterval(() => {
+      void refreshConversations();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [currentUser?.id, refreshConversations]);
 
   if (loadingUser) {
     return (

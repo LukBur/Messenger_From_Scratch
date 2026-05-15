@@ -23,3 +23,8 @@ export type ConversationResponse = {
   lastActivityAt: string;
   lastMessage: ConversationLastMessageResponse | null;
 };
+
+export type ConversationCreatedEvent = {
+  conversationId: string;
+  type: string;
+};

@@ -1,6 +1,7 @@
 import { Client, IMessage, StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { MessageResponse } from "@/types/message";
+import { ConversationCreatedEvent } from "@/types/conversation";
 
 let stompClient: Client | null = null;
 let isDisconnecting = false;
@@ -70,6 +71,31 @@ export async function subscribeToConversation(
     (frame: IMessage) => {
       const body = JSON.parse(frame.body) as MessageResponse;
       onMessage(body);
+    }
+  );
+}
+
+export async function subscribeToConversationUpdates(
+  userId: string,
+  onEvent: (event: ConversationCreatedEvent) => void
+): Promise<StompSubscription | null> {
+  if (!stompClient) {
+    return null;
+  }
+
+  if (!stompClient.connected) {
+    await waitForConnection(stompClient, 3000);
+  }
+
+  if (!stompClient.connected) {
+    return null;
+  }
+
+  return stompClient.subscribe(
+    `/topic/users/${userId}/conversations`,
+    (frame: IMessage) => {
+      const body = JSON.parse(frame.body) as ConversationCreatedEvent;
+      onEvent(body);
     }
   );
 }

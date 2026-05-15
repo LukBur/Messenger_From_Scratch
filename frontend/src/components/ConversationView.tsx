@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { StompSubscription } from "@stomp/stompjs";
 import { subscribeToConversation } from "@/lib/websocket";
 import { ConversationResponse } from "@/types/conversation";
@@ -27,6 +27,23 @@ function getOtherParticipant(
   );
 }
 
+function mergeMessages(
+  currentMessages: MessageResponse[],
+  incomingMessages: MessageResponse[]
+) {
+  const map = new Map<string, MessageResponse>();
+
+  [...currentMessages, ...incomingMessages].forEach((message) => {
+    map.set(message.id, message);
+  });
+
+  return Array.from(map.values()).sort((a, b) => {
+    return (
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+  });
+}
+
 export default function ConversationView({
   conversation,
   currentUser,
@@ -38,23 +55,34 @@ export default function ConversationView({
   const [errorMessage, setErrorMessage] = useState("");
 
   const subscriptionRef = useRef<StompSubscription | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const loadMessages = async (conversationId: string) => {
+  const activeConversationId = conversation?.id ?? null;
+
+  const loadMessages = async (
+    conversationId: string,
+    options?: { silent?: boolean }
+  ) => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
     try {
-      setLoadingMessages(true);
-      setErrorMessage("");
+      if (!options?.silent) {
+        setLoadingMessages(true);
+      }
 
+      setErrorMessage("");
       const data = await getConversationMessages(token, conversationId);
-      setMessages(data);
+
+      setMessages((prev) => mergeMessages(prev, data));
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not load messages"
       );
     } finally {
-      setLoadingMessages(false);
+      if (!options?.silent) {
+        setLoadingMessages(false);
+      }
     }
   };
 
@@ -73,12 +101,7 @@ export default function ConversationView({
         content,
       });
 
-      setMessages((prev) => {
-        const exists = prev.some((msg) => msg.id === sentMessage.id);
-        if (exists) return prev;
-        return [...prev, sentMessage];
-      });
-
+      setMessages((prev) => mergeMessages(prev, [sentMessage]));
       await onConversationUpdated();
     } catch (error) {
       setErrorMessage(
@@ -95,6 +118,7 @@ export default function ConversationView({
       return;
     }
 
+    setMessages([]);
     void loadMessages(conversation.id);
   }, [conversation?.id]);
 
@@ -114,12 +138,7 @@ export default function ConversationView({
       const subscription = await subscribeToConversation(
         conversation.id,
         (incomingMessage) => {
-          setMessages((prev) => {
-            const exists = prev.some((msg) => msg.id === incomingMessage.id);
-            if (exists) return prev;
-            return [...prev, incomingMessage];
-          });
-
+          setMessages((prev) => mergeMessages(prev, [incomingMessage]));
           void onConversationUpdated();
         }
       );
@@ -142,6 +161,20 @@ export default function ConversationView({
       }
     };
   }, [conversation?.id, onConversationUpdated]);
+
+  useEffect(() => {
+    if (!activeConversationId) return;
+
+    const interval = setInterval(() => {
+      void loadMessages(activeConversationId, { silent: true });
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   if (!conversation) {
     return (
@@ -169,7 +202,10 @@ export default function ConversationView({
         {loadingMessages ? (
           <p className="muted-text">Loading messages...</p>
         ) : (
-          <MessageList messages={messages} currentUser={currentUser} />
+          <>
+            <MessageList messages={messages} currentUser={currentUser} />
+            <div ref={messagesEndRef} />
+          </>
         )}
       </div>
 
