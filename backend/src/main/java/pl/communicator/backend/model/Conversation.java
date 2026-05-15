@@ -23,6 +23,12 @@ public class Conversation {
     @Setter
     private List<String> participantIds;
 
+    @Setter
+    private String name;
+
+    @Setter
+    private String ownerId;
+
     // Id of the user who created the conversation.
     @Setter
     private String createdBy;

@@ -87,6 +87,25 @@ export async function createPrivateConversation(
   return handleJsonResponse<ConversationResponse>(response);
 }
 
+export async function createGroupConversation(
+  token: string,
+  payload: {
+    name: string;
+    participantIds: string[];
+  }
+): Promise<ConversationResponse> {
+  const response = await fetch(`${API_URL}/conversations/group`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return handleJsonResponse<ConversationResponse>(response);
+}
+
 export async function getMyConversations(
   token: string
 ): Promise<ConversationResponse[]> {

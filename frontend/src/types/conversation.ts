@@ -17,6 +17,8 @@ export type ConversationLastMessageResponse = {
 export type ConversationResponse = {
   id: string;
   type: string;
+  name: string | null;
+  ownerId: string | null;
   participants: ConversationParticipantResponse[];
   createdBy: string;
   createdAt: string;
@@ -27,4 +29,5 @@ export type ConversationResponse = {
 export type ConversationCreatedEvent = {
   conversationId: string;
   type: string;
+  name: string | null;
 };

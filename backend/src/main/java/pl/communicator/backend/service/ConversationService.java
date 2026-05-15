@@ -6,6 +6,7 @@ import pl.communicator.backend.dto.ConversationCreatedEvent;
 import pl.communicator.backend.dto.ConversationLastMessageResponse;
 import pl.communicator.backend.dto.ConversationParticipantResponse;
 import pl.communicator.backend.dto.ConversationResponse;
+import pl.communicator.backend.dto.CreateGroupConversationRequest;
 import pl.communicator.backend.dto.CreatePrivateConversationRequest;
 import pl.communicator.backend.exception.ResourceNotFoundException;
 import pl.communicator.backend.model.Conversation;
@@ -17,7 +18,9 @@ import pl.communicator.backend.repository.MessageRepository;
 import pl.communicator.backend.repository.UserRepository;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ConversationService {
@@ -38,8 +41,10 @@ public class ConversationService {
     }
 
     // Creates a private conversation or returns an existing one for the same two users.
-    public ConversationResponse createOrGetPrivateConversation(String currentLogin,
-                                                               CreatePrivateConversationRequest request) {
+    public ConversationResponse createOrGetPrivateConversation(
+            String currentLogin,
+            CreatePrivateConversationRequest request
+    ) {
         User currentUser = userRepository.findByLogin(currentLogin)
                 .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
 
@@ -68,6 +73,8 @@ public class ConversationService {
         Conversation conversation = new Conversation();
         conversation.setType(ConversationType.PRIVATE);
         conversation.setParticipantIds(List.of(currentUser.getId(), targetUser.getId()));
+        conversation.setName(null);
+        conversation.setOwnerId(null);
         conversation.setCreatedBy(currentUser.getId());
         conversation.setCreatedAt(now);
         conversation.setLastActivityAt(now);
@@ -77,7 +84,8 @@ public class ConversationService {
 
         ConversationCreatedEvent event = new ConversationCreatedEvent(
                 savedConversation.getId(),
-                savedConversation.getType().name()
+                savedConversation.getType().name(),
+                savedConversation.getName()
         );
 
         messagingTemplate.convertAndSend(
@@ -93,12 +101,66 @@ public class ConversationService {
         return mapToResponse(savedConversation);
     }
 
-    // Returns all conversations of the current user, ordered by recent activity.
+    public ConversationResponse createGroupConversation(
+            String currentLogin,
+            CreateGroupConversationRequest request
+    ) {
+        User currentUser = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        String trimmedName = request.getName().trim();
+        if (trimmedName.isEmpty()) {
+            throw new IllegalArgumentException("Group name cannot be empty");
+        }
+
+        Set<String> uniqueParticipantIds = new LinkedHashSet<>(request.getParticipantIds());
+        uniqueParticipantIds.add(currentUser.getId());
+
+        if (uniqueParticipantIds.size() < 3) {
+            throw new IllegalArgumentException("Group conversation must have at least 3 participants");
+        }
+
+        List<User> participants = uniqueParticipantIds.stream()
+                .map(userId -> userRepository.findById(userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Participant not found: " + userId)))
+                .toList();
+
+        Instant now = Instant.now();
+
+        Conversation conversation = new Conversation();
+        conversation.setType(ConversationType.GROUP);
+        conversation.setParticipantIds(participants.stream().map(User::getId).toList());
+        conversation.setName(trimmedName);
+        conversation.setOwnerId(currentUser.getId());
+        conversation.setCreatedBy(currentUser.getId());
+        conversation.setCreatedAt(now);
+        conversation.setLastActivityAt(now);
+        conversation.setLastMessageId(null);
+
+        Conversation savedConversation = conversationRepository.save(conversation);
+
+        ConversationCreatedEvent event = new ConversationCreatedEvent(
+                savedConversation.getId(),
+                savedConversation.getType().name(),
+                savedConversation.getName()
+        );
+
+        for (User participant : participants) {
+            messagingTemplate.convertAndSend(
+                    "/topic/users/" + participant.getId() + "/conversations",
+                    event
+            );
+        }
+
+        return mapToResponse(savedConversation);
+    }
+
     public List<ConversationResponse> getMyConversations(String currentLogin) {
         User currentUser = userRepository.findByLogin(currentLogin)
                 .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
 
-        List<Conversation> conversations = conversationRepository.findByParticipantIdsContaining(currentUser.getId());
+        List<Conversation> conversations =
+                conversationRepository.findByParticipantIdsContaining(currentUser.getId());
 
         return conversations.stream()
                 .sorted((a, b) -> {
@@ -147,6 +209,8 @@ public class ConversationService {
         return new ConversationResponse(
                 conversation.getId(),
                 conversation.getType().name(),
+                conversation.getName(),
+                conversation.getOwnerId(),
                 participants,
                 conversation.getCreatedBy(),
                 conversation.getCreatedAt(),

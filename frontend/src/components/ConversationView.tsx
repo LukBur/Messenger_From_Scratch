@@ -186,15 +186,30 @@ export default function ConversationView({
     );
   }
 
-  const otherParticipant = getOtherParticipant(conversation, currentUser);
+  const otherParticipant =
+    conversation.type === "PRIVATE"
+      ? getOtherParticipant(conversation, currentUser)
+      : null;
 
   return (
     <section className="content-card conversation-view-card">
       <div className="conversation-header">
         <div>
-          <p className="eyebrow">Private conversation</p>
-          <h2>{otherParticipant?.displayName || "Conversation"}</h2>
-          <p className="muted-text">@{otherParticipant?.login}</p>
+          <p className="eyebrow">
+            {conversation.type === "GROUP" ? "Group conversation" : "Private conversation"}
+          </p>
+
+          <h2>
+            {conversation.type === "GROUP"
+              ? conversation.name || "Group conversation"
+              : otherParticipant?.displayName || "Conversation"}
+          </h2>
+
+          <p className="muted-text">
+            {conversation.type === "GROUP"
+              ? `${conversation.participants.length} members`
+              : `@${otherParticipant?.login}`}
+          </p>
         </div>
       </div>
 
