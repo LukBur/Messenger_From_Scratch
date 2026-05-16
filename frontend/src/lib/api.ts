@@ -149,3 +149,22 @@ export async function sendMessage(
 
   return handleJsonResponse<MessageResponse>(response);
 }
+
+export async function editMessage(
+  token: string,
+  messageId: string,
+  content: string
+): Promise<MessageResponse> {
+  const response = await fetch(`${API_URL}/messages/${messageId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      content,
+    }),
+  });
+
+  return handleJsonResponse<MessageResponse>(response);
+}

@@ -6,7 +6,7 @@ import { subscribeToConversation } from "@/lib/websocket";
 import { ConversationResponse } from "@/types/conversation";
 import { UserResponse } from "@/types/user";
 import { MessageResponse } from "@/types/message";
-import { getConversationMessages, sendMessage } from "@/lib/api";
+import { editMessage, getConversationMessages, sendMessage } from "@/lib/api";
 import MessageList from "@/components/MessageList";
 import MessageComposer from "@/components/MessageComposer";
 
@@ -55,7 +55,7 @@ export default function ConversationView({
   const [errorMessage, setErrorMessage] = useState("");
 
   const subscriptionRef = useRef<StompSubscription | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const activeConversationId = conversation?.id ?? null;
 
@@ -109,6 +109,29 @@ export default function ConversationView({
       );
     } finally {
       setSendingMessage(false);
+    }
+  };
+
+  const handleEditMessage = async (messageId: string, content: string) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setErrorMessage("");
+
+      const updatedMessage = await editMessage(token, messageId, content);
+
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === updatedMessage.id ? updatedMessage : message
+        )
+      );
+
+      await onConversationUpdated();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not edit message"
+      );
     }
   };
 
@@ -173,7 +196,13 @@ export default function ConversationView({
   }, [activeConversationId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages]);
 
   if (!conversation) {
@@ -213,13 +242,19 @@ export default function ConversationView({
         </div>
       </div>
 
-      <div className="conversation-messages-area">
+      <div
+        className="conversation-messages-area"
+        ref={messagesContainerRef}
+      >
         {loadingMessages ? (
           <p className="muted-text">Loading messages...</p>
         ) : (
           <>
-            <MessageList messages={messages} currentUser={currentUser} />
-            <div ref={messagesEndRef} />
+            <MessageList
+              messages={messages}
+              currentUser={currentUser}
+              onEditMessage={handleEditMessage}
+            />
           </>
         )}
       </div>

@@ -23,7 +23,7 @@ input {
 
 .page-container {
   width: 100%;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -344,15 +344,18 @@ input {
 }
 
 .message-bubble {
+  width: fit-content;
   max-width: 78%;
   background: #f3f4f6;
   border-radius: 14px;
   padding: 12px 14px;
+  align-self: flex-start;
 }
 
 .message-bubble.own {
   margin-left: auto;
   background: #dbeafe;
+  align-self: flex-end;
 }
 
 .message-meta {
@@ -484,4 +487,56 @@ input {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.message-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.message-edit-button {
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+}
+
+.message-edit-button:hover {
+  text-decoration: underline;
+}
+
+.message-edit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message-edit-box textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  resize: vertical;
+}
+
+.message-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }

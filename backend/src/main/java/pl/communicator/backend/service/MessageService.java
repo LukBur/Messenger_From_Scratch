@@ -1,6 +1,7 @@
 package pl.communicator.backend.service;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import pl.communicator.backend.dto.EditMessageRequest;
 import pl.communicator.backend.dto.MessageResponse;
 import pl.communicator.backend.dto.MessageSenderResponse;
 import pl.communicator.backend.dto.SendMessageRequest;
@@ -71,6 +72,37 @@ public class MessageService {
 
         messagingTemplate.convertAndSend(
                 "/topic/conversations/" + conversation.getId(),
+                response
+        );
+
+        return response;
+    }
+
+    public MessageResponse editMessage(String currentLogin, String messageId, EditMessageRequest request) {
+        User currentUser = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+
+        if (!message.getSenderId().equals(currentUser.getId())) {
+            throw new IllegalArgumentException("You can only edit your own messages");
+        }
+
+        String trimmedContent = request.getContent().trim();
+        if (trimmedContent.isEmpty()) {
+            throw new IllegalArgumentException("Message content cannot be empty");
+        }
+
+        message.setContent(trimmedContent);
+        message.setEdited(true);
+        message.setEditedAt(Instant.now());
+
+        Message updatedMessage = messageRepository.save(message);
+        MessageResponse response = mapToResponse(updatedMessage);
+
+        messagingTemplate.convertAndSend(
+                "/topic/conversations/" + updatedMessage.getConversationId(),
                 response
         );
 
