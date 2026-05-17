@@ -37,6 +37,15 @@ public class MessageService {
 
     // Sends a message only if the current user belongs to the selected conversation.
     public MessageResponse sendMessage(String currentLogin, SendMessageRequest request) {
+        Integer disappearAfterSeconds = request.getDisappearAfterSeconds();
+
+        boolean disappearing = disappearAfterSeconds != null
+                && disappearAfterSeconds > 0;
+
+        Instant expiresAt = disappearing
+                ? Instant.now().plusSeconds(disappearAfterSeconds)
+                : null;
+
         User currentUser = userRepository.findByLogin(currentLogin)
                 .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
 
@@ -60,6 +69,9 @@ public class MessageService {
         message.setCreatedAt(Instant.now());
         message.setEdited(false);
         message.setEditedAt(null);
+
+        message.setDisappearing(disappearing);
+        message.setExpiresAt(expiresAt);
 
         Message savedMessage = messageRepository.save(message);
 
@@ -121,7 +133,15 @@ public class MessageService {
             throw new IllegalArgumentException("You are not a participant of this conversation");
         }
 
-        return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId).stream()
+        List<Message> messages = messageRepository
+                .findByConversationIdOrderByCreatedAtAsc(conversationId);
+
+        messages.stream()
+                .filter(this::isExpired)
+                .forEach(messageRepository::delete);
+
+        return messages.stream()
+                .filter(message -> !isExpired(message))
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -145,7 +165,15 @@ public class MessageService {
                 message.getCreatedAt(),
                 message.isEdited(),
                 message.getEditedAt(),
+                message.getExpiresAt(),
+                message.isDisappearing(),
                 senderResponse
         );
+    }
+
+    private boolean isExpired(Message message) {
+        return message.isDisappearing()
+                && message.getExpiresAt() != null
+                && Instant.now().isAfter(message.getExpiresAt());
     }
 }

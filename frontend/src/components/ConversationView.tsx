@@ -86,7 +86,10 @@ export default function ConversationView({
     }
   };
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (
+      content: string,
+      disappearAfterSeconds?: number
+  ) => {
     if (!conversation) return;
 
     const token = localStorage.getItem("token");
@@ -99,6 +102,7 @@ export default function ConversationView({
       const sentMessage = await sendMessage(token, {
         conversationId: conversation.id,
         content,
+        disappearAfterSeconds,
       });
 
       setMessages((prev) => mergeMessages(prev, [sentMessage]));

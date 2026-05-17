@@ -36,11 +36,24 @@ public class Message {
     @Setter
     private Instant editedAt;
 
+    @Setter
+    private Instant expiresAt;
+
+    @Setter
+    private boolean disappearing;
+
     public Message() {
     }
 
-    public Message(String id, String conversationId, String senderId, String content,
-                   Instant createdAt, boolean edited, Instant editedAt) {
+    public Message(String id,
+                   String conversationId,
+                   String senderId,
+                   String content,
+                   Instant createdAt,
+                   boolean edited,
+                   Instant editedAt,
+                   Instant expiresAt,
+                   boolean disappearing) {
         this.id = id;
         this.conversationId = conversationId;
         this.senderId = senderId;
@@ -48,6 +61,8 @@ public class Message {
         this.createdAt = createdAt;
         this.edited = edited;
         this.editedAt = editedAt;
+        this.expiresAt = expiresAt;
+        this.disappearing = disappearing;
     }
 
 }

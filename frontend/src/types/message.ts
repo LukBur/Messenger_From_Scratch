@@ -12,10 +12,13 @@ export type MessageResponse = {
   createdAt: string;
   edited: boolean;
   editedAt: string | null;
+  expiresAt: string | null;
+  disappearing: boolean;
   sender: MessageSenderResponse;
 };
 
 export type SendMessageRequest = {
   conversationId: string;
   content: string;
+  disappearAfterSeconds?: number;
 };

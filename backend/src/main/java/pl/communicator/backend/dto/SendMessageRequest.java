@@ -6,6 +6,9 @@ import lombok.Setter;
 
 @Setter
 @Getter
+
+
+
 public class SendMessageRequest {
 
     @NotBlank(message = "Conversation id is required")
@@ -13,6 +16,8 @@ public class SendMessageRequest {
 
     @NotBlank(message = "Message content is required")
     private String content;
+
+    private Integer disappearAfterSeconds;
 
     public SendMessageRequest() {
     }
