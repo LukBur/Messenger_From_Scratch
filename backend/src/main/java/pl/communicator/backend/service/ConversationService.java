@@ -2,12 +2,7 @@ package pl.communicator.backend.service;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-import pl.communicator.backend.dto.ConversationCreatedEvent;
-import pl.communicator.backend.dto.ConversationLastMessageResponse;
-import pl.communicator.backend.dto.ConversationParticipantResponse;
-import pl.communicator.backend.dto.ConversationResponse;
-import pl.communicator.backend.dto.CreateGroupConversationRequest;
-import pl.communicator.backend.dto.CreatePrivateConversationRequest;
+import pl.communicator.backend.dto.*;
 import pl.communicator.backend.exception.ResourceNotFoundException;
 import pl.communicator.backend.model.Conversation;
 import pl.communicator.backend.model.ConversationType;
@@ -98,6 +93,7 @@ public class ConversationService {
                 event
         );
 
+        sendConversationUpdatedEvent(savedConversation);
         return mapToResponse(savedConversation);
     }
 
@@ -152,6 +148,7 @@ public class ConversationService {
             );
         }
 
+        sendConversationUpdatedEvent(savedConversation);
         return mapToResponse(savedConversation);
     }
 
@@ -171,6 +168,120 @@ public class ConversationService {
                 })
                 .map(this::mapToResponse)
                 .toList();
+    }
+
+    public ConversationResponse updateGroupName(
+            String currentLogin,
+            String conversationId,
+            UpdateGroupNameRequest request
+    ) {
+        User currentUser = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+
+        validateGroupOwnership(currentUser, conversation);
+
+        String trimmedName = request.getName().trim();
+        if (trimmedName.isEmpty()) {
+            throw new IllegalArgumentException("Group name cannot be empty");
+        }
+
+        conversation.setName(trimmedName);
+        Conversation updatedConversation = conversationRepository.save(conversation);
+
+        sendConversationUpdatedEvent(updatedConversation);
+
+        return mapToResponse(updatedConversation);
+    }
+
+    public ConversationResponse addParticipantToGroup(
+            String currentLogin,
+            String conversationId,
+            UpdateGroupParticipantRequest request
+    ) {
+        User currentUser = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+
+        validateGroupOwnership(currentUser, conversation);
+
+        User userToAdd = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User to add not found"));
+
+        if (conversation.getParticipantIds().contains(userToAdd.getId())) {
+            throw new IllegalArgumentException("User is already a participant of this group");
+        }
+
+        conversation.getParticipantIds().add(userToAdd.getId());
+        Conversation updatedConversation = conversationRepository.save(conversation);
+
+        sendConversationUpdatedEvent(updatedConversation);
+
+        return mapToResponse(updatedConversation);
+    }
+
+    public ConversationResponse removeParticipantFromGroup(
+            String currentLogin,
+            String conversationId,
+            UpdateGroupParticipantRequest request
+    ) {
+        User currentUser = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+
+        validateGroupOwnership(currentUser, conversation);
+
+        String userIdToRemove = request.getUserId();
+
+        if (!conversation.getParticipantIds().contains(userIdToRemove)) {
+            throw new IllegalArgumentException("User is not a participant of this group");
+        }
+
+        if (userIdToRemove.equals(conversation.getOwnerId())) {
+            throw new IllegalArgumentException("Owner cannot be removed from the group");
+        }
+
+        if (conversation.getParticipantIds().size() <= 3) {
+            throw new IllegalArgumentException("Group must have at least 3 participants");
+        }
+
+        conversation.getParticipantIds().remove(userIdToRemove);
+        Conversation updatedConversation = conversationRepository.save(conversation);
+
+        sendConversationUpdatedEvent(updatedConversation);
+
+        return mapToResponse(updatedConversation);
+    }
+
+    private void validateGroupOwnership(User currentUser, Conversation conversation) {
+        if (conversation.getType() != ConversationType.GROUP) {
+            throw new IllegalArgumentException("This operation is only allowed for group conversations");
+        }
+
+        if (!currentUser.getId().equals(conversation.getOwnerId())) {
+            throw new IllegalArgumentException("Only group owner can manage this group");
+        }
+    }
+
+    private void sendConversationUpdatedEvent(Conversation conversation) {
+        ConversationUpdatedEvent event = new ConversationUpdatedEvent(
+                conversation.getId(),
+                conversation.getType().name(),
+                conversation.getName()
+        );
+
+        for (String participantId : conversation.getParticipantIds()) {
+            messagingTemplate.convertAndSend(
+                    "/topic/users/" + participantId + "/conversation-updates",
+                    event
+            );
+        }
     }
 
     // Converts the conversation entity into a response object used by the API.

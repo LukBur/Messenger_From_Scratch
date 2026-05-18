@@ -14,6 +14,7 @@ type ConversationViewProps = {
   conversation: ConversationResponse | null;
   currentUser: UserResponse;
   onConversationUpdated: () => Promise<void>;
+  onOpenManageGroup: () => void;
 };
 
 function getOtherParticipant(
@@ -48,6 +49,7 @@ export default function ConversationView({
   conversation,
   currentUser,
   onConversationUpdated,
+  onOpenManageGroup,
 }: ConversationViewProps) {
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -61,7 +63,7 @@ export default function ConversationView({
 
   const loadMessages = async (
     conversationId: string,
-    options?: { silent?: boolean }
+    options?: { silent?: boolean },
   ) => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -77,7 +79,7 @@ export default function ConversationView({
       setMessages((prev) => mergeMessages(prev, data));
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Could not load messages"
+        error instanceof Error ? error.message : "Could not load messages",
       );
     } finally {
       if (!options?.silent) {
@@ -87,8 +89,8 @@ export default function ConversationView({
   };
 
   const handleSendMessage = async (
-      content: string,
-      disappearAfterSeconds?: number
+    content: string,
+    disappearAfterSeconds?: number,
   ) => {
     if (!conversation) return;
 
@@ -109,7 +111,7 @@ export default function ConversationView({
       await onConversationUpdated();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Could not send message"
+        error instanceof Error ? error.message : "Could not send message",
       );
     } finally {
       setSendingMessage(false);
@@ -127,14 +129,14 @@ export default function ConversationView({
 
       setMessages((prev) =>
         prev.map((message) =>
-          message.id === updatedMessage.id ? updatedMessage : message
-        )
+          message.id === updatedMessage.id ? updatedMessage : message,
+        ),
       );
 
       await onConversationUpdated();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Could not edit message"
+        error instanceof Error ? error.message : "Could not edit message",
       );
     }
   };
@@ -167,7 +169,7 @@ export default function ConversationView({
         (incomingMessage) => {
           setMessages((prev) => mergeMessages(prev, [incomingMessage]));
           void onConversationUpdated();
-        }
+        },
       );
 
       if (!isCancelled) {
@@ -227,29 +229,40 @@ export default function ConversationView({
   return (
     <section className="content-card conversation-view-card">
       <div className="conversation-header">
-        <div>
-          <p className="eyebrow">
-            {conversation.type === "GROUP" ? "Group conversation" : "Private conversation"}
-          </p>
+        <div className="conversation-header-main">
+          <div>
+            <p className="eyebrow">
+              {conversation.type === "GROUP"
+                ? "Group conversation"
+                : "Private conversation"}
+            </p>
 
-          <h2>
-            {conversation.type === "GROUP"
-              ? conversation.name || "Group conversation"
-              : otherParticipant?.displayName || "Conversation"}
-          </h2>
+            <h2>
+              {conversation.type === "GROUP"
+                ? conversation.name || "Group conversation"
+                : otherParticipant?.displayName || "Conversation"}
+            </h2>
 
-          <p className="muted-text">
-            {conversation.type === "GROUP"
-              ? `${conversation.participants.length} members`
-              : `@${otherParticipant?.login}`}
-          </p>
+            <p className="muted-text">
+              {conversation.type === "GROUP"
+                ? `${conversation.participants.length} members`
+                : `@${otherParticipant?.login}`}
+            </p>
+          </div>
+
+          {conversation.type === "GROUP" && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onOpenManageGroup}
+            >
+              Manage group
+            </button>
+          )}
         </div>
       </div>
 
-      <div
-        className="conversation-messages-area"
-        ref={messagesContainerRef}
-      >
+      <div className="conversation-messages-area" ref={messagesContainerRef}>
         {loadingMessages ? (
           <p className="muted-text">Loading messages...</p>
         ) : (

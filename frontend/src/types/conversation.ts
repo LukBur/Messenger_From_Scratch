@@ -31,3 +31,9 @@ export type ConversationCreatedEvent = {
   type: string;
   name: string | null;
 };
+
+export type ConversationUpdatedEvent = {
+  conversationId: string;
+  type: string;
+  name: string | null;
+};

@@ -106,6 +106,66 @@ export async function createGroupConversation(
   return handleJsonResponse<ConversationResponse>(response);
 }
 
+export async function updateGroupName(
+  token: string,
+  conversationId: string,
+  name: string,
+): Promise<ConversationResponse> {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/group/name`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name }),
+    },
+  );
+
+  return handleJsonResponse<ConversationResponse>(response);
+}
+
+export async function addParticipantToGroup(
+  token: string,
+  conversationId: string,
+  userId: string,
+): Promise<ConversationResponse> {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/group/participants`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId }),
+    },
+  );
+
+  return handleJsonResponse<ConversationResponse>(response);
+}
+
+export async function removeParticipantFromGroup(
+  token: string,
+  conversationId: string,
+  userId: string,
+): Promise<ConversationResponse> {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/group/participants`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId }),
+    },
+  );
+
+  return handleJsonResponse<ConversationResponse>(response);
+}
+
 export async function getMyConversations(
   token: string
 ): Promise<ConversationResponse[]> {

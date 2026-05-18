@@ -6,6 +6,7 @@ import UserSearch from "@/components/UserSearch";
 import ConversationList from "@/components/ConversationList";
 import ConversationView from "@/components/ConversationView";
 import CreateGroupModal from "@/components/CreateGroupModal";
+import ManageGroupModal from "@/components/ManageGroupModal";
 
 type ChatLayoutProps = {
   currentUser: UserResponse;
@@ -24,6 +25,17 @@ type ChatLayoutProps = {
   }) => Promise<void>;
   onSelectConversation: (conversation: ConversationResponse) => void;
   onRefreshConversations: () => Promise<void>;
+
+  isManageGroupOpen: boolean;
+  onOpenManageGroup: () => void;
+  onCloseManageGroup: () => void;
+  onUpdateGroupName: (conversationId: string, name: string) => Promise<void>;
+  onAddParticipant: (conversationId: string, userId: string) => Promise<void>;
+  onRemoveParticipant: (
+    conversationId: string,
+    userId: string,
+  ) => Promise<void>;
+
   onLogout: () => void;
 };
 
@@ -41,6 +53,14 @@ export default function ChatLayout({
   onCreateGroup,
   onSelectConversation,
   onRefreshConversations,
+
+  isManageGroupOpen,
+  onOpenManageGroup,
+  onCloseManageGroup,
+  onUpdateGroupName,
+  onAddParticipant,
+  onRemoveParticipant,
+
   onLogout,
 }: ChatLayoutProps) {
   return (
@@ -84,6 +104,7 @@ export default function ChatLayout({
               conversation={selectedConversation}
               currentUser={currentUser}
               onConversationUpdated={onRefreshConversations}
+              onOpenManageGroup={onOpenManageGroup}
             />
           </div>
         </div>
@@ -96,6 +117,18 @@ export default function ChatLayout({
         loading={searchLoading}
         onSearch={onSearchUsers}
         onCreateGroup={onCreateGroup}
+      />
+      <ManageGroupModal
+        isOpen={isManageGroupOpen}
+        conversation={selectedConversation}
+        currentUser={currentUser}
+        searchResults={searchResults}
+        loading={searchLoading}
+        onClose={onCloseManageGroup}
+        onSearchUsers={onSearchUsers}
+        onUpdateGroupName={onUpdateGroupName}
+        onAddParticipant={onAddParticipant}
+        onRemoveParticipant={onRemoveParticipant}
       />
     </>
   );

@@ -3,9 +3,7 @@ package pl.communicator.backend.controller;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import pl.communicator.backend.dto.ConversationResponse;
-import pl.communicator.backend.dto.CreateGroupConversationRequest;
-import pl.communicator.backend.dto.CreatePrivateConversationRequest;
+import pl.communicator.backend.dto.*;
 import pl.communicator.backend.service.ConversationService;
 
 import java.util.List;
@@ -35,10 +33,37 @@ public class ConversationController {
             @Valid @RequestBody CreateGroupConversationRequest request,
             Authentication authentication
     ) {
-        // Returns all conversations that belong to the currently authenticated user.
         return conversationService.createGroupConversation(authentication.getName(), request);
     }
 
+    @PutMapping("/{conversationId}/group/name")
+    public ConversationResponse updateGroupName(
+            @PathVariable String conversationId,
+            @Valid @RequestBody UpdateGroupNameRequest request,
+            Authentication authentication
+    ) {
+        return conversationService.updateGroupName(authentication.getName(), conversationId, request);
+    }
+
+    @PostMapping("/{conversationId}/group/participants")
+    public ConversationResponse addParticipantToGroup(
+            @PathVariable String conversationId,
+            @Valid @RequestBody UpdateGroupParticipantRequest request,
+            Authentication authentication
+    ) {
+        return conversationService.addParticipantToGroup(authentication.getName(), conversationId, request);
+    }
+
+    @DeleteMapping("/{conversationId}/group/participants")
+    public ConversationResponse removeParticipantFromGroup(
+            @PathVariable String conversationId,
+            @Valid @RequestBody UpdateGroupParticipantRequest request,
+            Authentication authentication
+    ) {
+        return conversationService.removeParticipantFromGroup(authentication.getName(), conversationId, request);
+    }
+
+    // Returns all conversations that belong to the currently authenticated user.
     @GetMapping("/my")
     public List<ConversationResponse> getMyConversations(Authentication authentication) {
         return conversationService.getMyConversations(authentication.getName());

@@ -540,3 +540,24 @@ input {
   justify-content: flex-end;
   gap: 10px;
 }
+
+.manage-group-section {
+  margin-top: 24px;
+}
+
+.group-owner-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  color: #374151;
+  background: #e5e7eb;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.conversation-header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}

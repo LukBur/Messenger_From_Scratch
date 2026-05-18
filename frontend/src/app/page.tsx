@@ -5,13 +5,16 @@ import { StompSubscription } from "@stomp/stompjs";
 import AuthForm from "@/components/AuthForm";
 import ChatLayout from "@/components/ChatLayout";
 import {
-  createPrivateConversation,
+  addParticipantToGroup,
   createGroupConversation,
+  createPrivateConversation,
   getCurrentUser,
   getMyConversations,
   loginUser,
   registerUser,
+  removeParticipantFromGroup,
   searchUsers,
+  updateGroupName,
 } from "@/lib/api";
 import { ConversationResponse } from "@/types/conversation";
 import { UserSearchResponse, UserResponse } from "@/types/user";
@@ -30,6 +33,7 @@ export default function HomePage() {
   const [loadingUser, setLoadingUser] = useState(true);
 
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isManageGroupOpen, setIsManageGroupOpen] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
   const [searchResults, setSearchResults] = useState<UserSearchResponse[]>([]);
@@ -224,6 +228,60 @@ export default function HomePage() {
     }
   };
 
+  const handleUpdateGroupName = async (
+    conversationId: string,
+    name: string,
+  ) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setMessage("");
+      await updateGroupName(token, conversationId, name);
+      await loadConversations(token, conversationId);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not update group name",
+      );
+    }
+  };
+
+  const handleAddParticipant = async (
+    conversationId: string,
+    userId: string,
+  ) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setMessage("");
+      await addParticipantToGroup(token, conversationId, userId);
+      await loadConversations(token, conversationId);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not add participant",
+      );
+    }
+  };
+
+  const handleRemoveParticipant = async (
+    conversationId: string,
+    userId: string,
+  ) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setMessage("");
+      await removeParticipantFromGroup(token, conversationId, userId);
+      await loadConversations(token, conversationId);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not remove participant",
+      );
+    }
+  };
+
   const handleLogout = () => {
     if (conversationUpdatesSubscriptionRef.current) {
       conversationUpdatesSubscriptionRef.current.unsubscribe();
@@ -300,6 +358,12 @@ export default function HomePage() {
               onCreateGroup={handleCreateGroup}
               onSelectConversation={setSelectedConversation}
               onRefreshConversations={refreshConversations}
+              isManageGroupOpen={isManageGroupOpen}
+              onOpenManageGroup={() => setIsManageGroupOpen(true)}
+              onCloseManageGroup={() => setIsManageGroupOpen(false)}
+              onUpdateGroupName={handleUpdateGroupName}
+              onAddParticipant={handleAddParticipant}
+              onRemoveParticipant={handleRemoveParticipant}
               onLogout={handleLogout}
             />
             {message && <p className="status-message">{message}</p>}
