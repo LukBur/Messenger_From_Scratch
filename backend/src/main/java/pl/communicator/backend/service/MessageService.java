@@ -1,10 +1,7 @@
 package pl.communicator.backend.service;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import pl.communicator.backend.dto.EditMessageRequest;
-import pl.communicator.backend.dto.MessageResponse;
-import pl.communicator.backend.dto.MessageSenderResponse;
-import pl.communicator.backend.dto.SendMessageRequest;
+import pl.communicator.backend.dto.*;
 import pl.communicator.backend.exception.ResourceNotFoundException;
 import pl.communicator.backend.model.Conversation;
 import pl.communicator.backend.model.Message;
@@ -101,6 +98,10 @@ public class MessageService {
             throw new IllegalArgumentException("You can only edit your own messages");
         }
 
+        if (isExpired(message)) {
+            throw new IllegalArgumentException("Message has already expired");
+        }
+
         String trimmedContent = request.getContent().trim();
         if (trimmedContent.isEmpty()) {
             throw new IllegalArgumentException("Message content cannot be empty");
@@ -119,6 +120,37 @@ public class MessageService {
         );
 
         return response;
+    }
+
+    public void deleteMessage(String currentLogin, String messageId) {
+        User currentUser = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+
+        Conversation conversation = conversationRepository.findById(message.getConversationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+
+        boolean isAuthor = message.getSenderId().equals(currentUser.getId());
+        boolean isGroupOwner = conversation.getType().name().equals("GROUP")
+                && currentUser.getId().equals(conversation.getOwnerId());
+
+        if (!isAuthor && !isGroupOwner) {
+            throw new IllegalArgumentException("You cannot delete this message");
+        }
+
+        String conversationId = message.getConversationId();
+        String deletedMessageId = message.getId();
+
+        messageRepository.delete(message);
+
+        updateConversationAfterMessageDeletion(conversationId, deletedMessageId);
+
+        messagingTemplate.convertAndSend(
+                "/topic/conversations/" + conversationId + "/deleted",
+                new MessageDeletedEvent(deletedMessageId, conversationId)
+        );
     }
 
     // Returns messages from a conversation after checking that the user has access to it.
@@ -140,10 +172,33 @@ public class MessageService {
                 .filter(this::isExpired)
                 .forEach(messageRepository::delete);
 
-        return messages.stream()
+        return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId).stream()
                 .filter(message -> !isExpired(message))
                 .map(this::mapToResponse)
                 .toList();
+    }
+
+    private void updateConversationAfterMessageDeletion(String conversationId, String deletedMessageId) {
+        Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
+        if (conversation == null) {
+            return;
+        }
+
+        if (deletedMessageId.equals(conversation.getLastMessageId())) {
+            List<Message> remainingMessages =
+                    messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+
+            if (remainingMessages.isEmpty()) {
+                conversation.setLastMessageId(null);
+                conversation.setLastActivityAt(conversation.getCreatedAt());
+            } else {
+                Message lastMessage = remainingMessages.get(remainingMessages.size() - 1);
+                conversation.setLastMessageId(lastMessage.getId());
+                conversation.setLastActivityAt(lastMessage.getCreatedAt());
+            }
+
+            conversationRepository.save(conversation);
+        }
     }
 
     // Converts a message entity into a response object with sender information.

@@ -39,18 +39,17 @@ export default function MessageComposer({
         value={content}
         onChange={(e) => setContent(e.target.value)}
       />
-        <select
-            value={disappearAfterSeconds}
-            onChange={(e) =>
-                setDisappearAfterSeconds(Number(e.target.value))
-            }
-        >
-            <option value={0}>Normal message</option>
-            <option value={10}>Disappear after 10s</option>
-            <option value={30}>Disappear after 30s</option>
-            <option value={60}>Disappear after 1m</option>
-            <option value={300}>Disappear after 5m</option>
-        </select>
+      <select
+        className="message-type-select"
+        value={disappearAfterSeconds}
+        onChange={(e) => setDisappearAfterSeconds(Number(e.target.value))}
+      >
+        <option value={0}>Normal message</option>
+        <option value={10}>Disappear after 10s</option>
+        <option value={30}>Disappear after 30s</option>
+        <option value={60}>Disappear after 1m</option>
+        <option value={300}>Disappear after 5m</option>
+      </select>
       <button className="primary-button" type="submit" disabled={loading}>
         {loading ? "Sending..." : "Send"}
       </button>

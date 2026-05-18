@@ -22,3 +22,8 @@ export type SendMessageRequest = {
   content: string;
   disappearAfterSeconds?: number;
 };
+
+export type MessageDeletedEvent = {
+  messageId: string;
+  conversationId: string;
+};

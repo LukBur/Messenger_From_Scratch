@@ -561,3 +561,51 @@ input {
   align-items: flex-start;
   gap: 16px;
 }
+
+.message-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.message-delete-button {
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+}
+
+.message-delete-button:hover {
+  text-decoration: underline;
+}
+
+.message-expire-timer {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.conversation-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.conversation-title-row h2 {
+  margin: 0;
+}
+
+.message-type-select {
+  height: 48px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: #ffffff;
+  color: #111827;
+  min-width: 190px;
+  cursor: pointer;
+}

@@ -38,6 +38,14 @@ public class MessageController {
         return messageService.editMessage(authentication.getName(), messageId, request);
     }
 
+    @DeleteMapping("/messages/{messageId}")
+    public void deleteMessage(
+            @PathVariable String messageId,
+            Authentication authentication
+    ) {
+        messageService.deleteMessage(authentication.getName(), messageId);
+    }
+
     // Returns messages from a selected conversation, only for the authenticated user.
     @GetMapping("/conversations/{conversationId}/messages")
     public List<MessageResponse> getConversationMessages(

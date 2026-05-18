@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StompSubscription } from "@stomp/stompjs";
-import { subscribeToConversation } from "@/lib/websocket";
+import {
+  subscribeToConversation,
+  subscribeToDeletedMessages,
+} from "@/lib/websocket";
 import { ConversationResponse } from "@/types/conversation";
 import { UserResponse } from "@/types/user";
 import { MessageResponse } from "@/types/message";
-import { editMessage, getConversationMessages, sendMessage } from "@/lib/api";
+import {
+  deleteMessage,
+  editMessage,
+  getConversationMessages,
+  sendMessage,
+} from "@/lib/api";
 import MessageList from "@/components/MessageList";
 import MessageComposer from "@/components/MessageComposer";
 
@@ -19,18 +27,18 @@ type ConversationViewProps = {
 
 function getOtherParticipant(
   conversation: ConversationResponse,
-  currentUser: UserResponse
+  currentUser: UserResponse,
 ) {
   return (
     conversation.participants.find(
-      (participant) => participant.id !== currentUser.id
+      (participant) => participant.id !== currentUser.id,
     ) || conversation.participants[0]
   );
 }
 
 function mergeMessages(
   currentMessages: MessageResponse[],
-  incomingMessages: MessageResponse[]
+  incomingMessages: MessageResponse[],
 ) {
   const map = new Map<string, MessageResponse>();
 
@@ -39,9 +47,7 @@ function mergeMessages(
   });
 
   return Array.from(map.values()).sort((a, b) => {
-    return (
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 }
 
@@ -57,6 +63,7 @@ export default function ConversationView({
   const [errorMessage, setErrorMessage] = useState("");
 
   const subscriptionRef = useRef<StompSubscription | null>(null);
+  const deleteSubscriptionRef = useRef<StompSubscription | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const activeConversationId = conversation?.id ?? null;
@@ -75,7 +82,6 @@ export default function ConversationView({
 
       setErrorMessage("");
       const data = await getConversationMessages(token, conversationId);
-
       setMessages((prev) => mergeMessages(prev, data));
     } catch (error) {
       setErrorMessage(
@@ -141,6 +147,24 @@ export default function ConversationView({
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setErrorMessage("");
+
+      await deleteMessage(token, messageId);
+
+      setMessages((prev) => prev.filter((message) => message.id !== messageId));
+      await onConversationUpdated();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not delete message",
+      );
+    }
+  };
+
   useEffect(() => {
     if (!conversation) {
       setMessages([]);
@@ -192,6 +216,49 @@ export default function ConversationView({
   }, [conversation?.id, onConversationUpdated]);
 
   useEffect(() => {
+    if (!conversation) {
+      return;
+    }
+
+    if (deleteSubscriptionRef.current) {
+      deleteSubscriptionRef.current.unsubscribe();
+      deleteSubscriptionRef.current = null;
+    }
+
+    let isCancelled = false;
+
+    const setupDeleteSubscription = async () => {
+      const subscription = await subscribeToDeletedMessages(
+        conversation.id,
+        (event) => {
+          setMessages((prev) =>
+            prev.filter((message) => message.id !== event.messageId),
+          );
+
+          void onConversationUpdated();
+        },
+      );
+
+      if (!isCancelled) {
+        deleteSubscriptionRef.current = subscription;
+      } else {
+        subscription?.unsubscribe();
+      }
+    };
+
+    void setupDeleteSubscription();
+
+    return () => {
+      isCancelled = true;
+
+      if (deleteSubscriptionRef.current) {
+        deleteSubscriptionRef.current.unsubscribe();
+        deleteSubscriptionRef.current = null;
+      }
+    };
+  }, [conversation?.id, onConversationUpdated]);
+
+  useEffect(() => {
     if (!activeConversationId) return;
 
     const interval = setInterval(() => {
@@ -229,26 +296,18 @@ export default function ConversationView({
   return (
     <section className="content-card conversation-view-card">
       <div className="conversation-header">
-        <div className="conversation-header-main">
-          <div>
-            <p className="eyebrow">
-              {conversation.type === "GROUP"
-                ? "Group conversation"
-                : "Private conversation"}
-            </p>
+        <p className="eyebrow">
+          {conversation.type === "GROUP"
+            ? "Group conversation"
+            : "Private conversation"}
+        </p>
 
-            <h2>
-              {conversation.type === "GROUP"
-                ? conversation.name || "Group conversation"
-                : otherParticipant?.displayName || "Conversation"}
-            </h2>
-
-            <p className="muted-text">
-              {conversation.type === "GROUP"
-                ? `${conversation.participants.length} members`
-                : `@${otherParticipant?.login}`}
-            </p>
-          </div>
+        <div className="conversation-title-row">
+          <h2>
+            {conversation.type === "GROUP"
+              ? conversation.name || "Group conversation"
+              : otherParticipant?.displayName || "Conversation"}
+          </h2>
 
           {conversation.type === "GROUP" && (
             <button
@@ -260,19 +319,24 @@ export default function ConversationView({
             </button>
           )}
         </div>
+
+        <p className="muted-text">
+          {conversation.type === "GROUP"
+            ? `${conversation.participants.length} members`
+            : `@${otherParticipant?.login}`}
+        </p>
       </div>
 
       <div className="conversation-messages-area" ref={messagesContainerRef}>
         {loadingMessages ? (
           <p className="muted-text">Loading messages...</p>
         ) : (
-          <>
-            <MessageList
-              messages={messages}
-              currentUser={currentUser}
-              onEditMessage={handleEditMessage}
-            />
-          </>
+          <MessageList
+            messages={messages}
+            currentUser={currentUser}
+            onEditMessage={handleEditMessage}
+            onDeleteMessage={handleDeleteMessage}
+          />
         )}
       </div>
 

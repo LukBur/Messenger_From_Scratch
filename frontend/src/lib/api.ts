@@ -1,4 +1,9 @@
-import { LoginRequest, LoginResponse, ApiMessageResponse, RegisterRequest } from "@/types/auth";
+import {
+  LoginRequest,
+  LoginResponse,
+  ApiMessageResponse,
+  RegisterRequest,
+} from "@/types/auth";
 import { UserSearchResponse, UserResponse } from "@/types/user";
 import { ConversationResponse } from "@/types/conversation";
 import { MessageResponse, SendMessageRequest } from "@/types/message";
@@ -30,7 +35,7 @@ export async function loginUser(payload: LoginRequest): Promise<LoginResponse> {
 }
 
 export async function registerUser(
-  payload: RegisterRequest
+  payload: RegisterRequest,
 ): Promise<ApiMessageResponse> {
   const response = await fetch(`${API_URL}/auth/register`, {
     method: "POST",
@@ -55,7 +60,7 @@ export async function getCurrentUser(token: string): Promise<UserResponse> {
 
 export async function searchUsers(
   token: string,
-  query: string
+  query: string,
 ): Promise<UserSearchResponse[]> {
   const response = await fetch(
     `${API_URL}/users/search?query=${encodeURIComponent(query)}`,
@@ -63,7 +68,7 @@ export async function searchUsers(
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    }
+    },
   );
 
   return handleJsonResponse<UserSearchResponse[]>(response);
@@ -71,7 +76,7 @@ export async function searchUsers(
 
 export async function createPrivateConversation(
   token: string,
-  targetUserId: string
+  targetUserId: string,
 ): Promise<ConversationResponse> {
   const response = await fetch(`${API_URL}/conversations/private`, {
     method: "POST",
@@ -92,7 +97,7 @@ export async function createGroupConversation(
   payload: {
     name: string;
     participantIds: string[];
-  }
+  },
 ): Promise<ConversationResponse> {
   const response = await fetch(`${API_URL}/conversations/group`, {
     method: "POST",
@@ -167,7 +172,7 @@ export async function removeParticipantFromGroup(
 }
 
 export async function getMyConversations(
-  token: string
+  token: string,
 ): Promise<ConversationResponse[]> {
   const response = await fetch(`${API_URL}/conversations/my`, {
     headers: {
@@ -180,7 +185,7 @@ export async function getMyConversations(
 
 export async function getConversationMessages(
   token: string,
-  conversationId: string
+  conversationId: string,
 ): Promise<MessageResponse[]> {
   const response = await fetch(
     `${API_URL}/conversations/${conversationId}/messages`,
@@ -188,7 +193,7 @@ export async function getConversationMessages(
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    }
+    },
   );
 
   return handleJsonResponse<MessageResponse[]>(response);
@@ -196,7 +201,7 @@ export async function getConversationMessages(
 
 export async function sendMessage(
   token: string,
-  payload: SendMessageRequest
+  payload: SendMessageRequest,
 ): Promise<MessageResponse> {
   const response = await fetch(`${API_URL}/messages`, {
     method: "POST",
@@ -213,7 +218,7 @@ export async function sendMessage(
 export async function editMessage(
   token: string,
   messageId: string,
-  content: string
+  content: string,
 ): Promise<MessageResponse> {
   const response = await fetch(`${API_URL}/messages/${messageId}`, {
     method: "PUT",
@@ -227,4 +232,23 @@ export async function editMessage(
   });
 
   return handleJsonResponse<MessageResponse>(response);
+}
+
+export async function deleteMessage(
+  token: string,
+  messageId: string,
+): Promise<void> {
+  const response = await fetch(`${API_URL}/messages/${messageId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const errorMessage =
+      data?.message || `Request failed with status ${response.status}`;
+    throw new Error(errorMessage);
+  }
 }
