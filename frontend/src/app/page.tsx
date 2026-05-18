@@ -15,6 +15,7 @@ import {
   removeParticipantFromGroup,
   searchUsers,
   updateGroupName,
+  updateProfile,
 } from "@/lib/api";
 import { ConversationResponse } from "@/types/conversation";
 import { UserSearchResponse, UserResponse } from "@/types/user";
@@ -34,6 +35,8 @@ export default function HomePage() {
 
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isManageGroupOpen, setIsManageGroupOpen] = useState(false);
+
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
   const [searchResults, setSearchResults] = useState<UserSearchResponse[]>([]);
@@ -146,6 +149,27 @@ export default function HomePage() {
       setMessage(error instanceof Error ? error.message : "Login failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async (payload: {
+    displayName: string;
+    avatarUrl: string | null;
+  }) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setMessage("");
+
+      const updatedUser = await updateProfile(token, payload);
+      setCurrentUser(updatedUser);
+
+      await loadConversations(token, selectedConversation?.id || undefined);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not update profile",
+      );
     }
   };
 
@@ -346,6 +370,10 @@ export default function HomePage() {
           <>
             <ChatLayout
               currentUser={currentUser}
+              isProfileOpen={isProfileOpen}
+              onOpenProfile={() => setIsProfileOpen(true)}
+              onCloseProfile={() => setIsProfileOpen(false)}
+              onSaveProfile={handleSaveProfile}
               searchResults={searchResults}
               searchLoading={searchLoading}
               conversations={conversations}

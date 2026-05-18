@@ -1,11 +1,16 @@
 package pl.communicator.backend.controller;
 
+import jakarta.validation.Valid;
+import pl.communicator.backend.dto.UpdateProfileRequest;
 import pl.communicator.backend.dto.UserResponse;
 import pl.communicator.backend.dto.UserSearchResponse;
 import pl.communicator.backend.model.User;
 import pl.communicator.backend.repository.UserRepository;
+import pl.communicator.backend.service.UserService;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,9 +22,11 @@ import java.util.List;
 public class UserController {
 
     private final UserRepository userRepository;
+    private final UserService userService;
 
-    public UserController(UserRepository userRepository) {
+    public UserController(UserRepository userRepository, UserService userService) {
         this.userRepository = userRepository;
+        this.userService = userService;
     }
 
     // Returns profile data of the currently authenticated user.
@@ -38,6 +45,14 @@ public class UserController {
                 user.getRole().name(),
                 user.getAvatarUrl()
         );
+    }
+
+    @PutMapping("/me/profile")
+    public UserResponse updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request,
+            Authentication authentication
+    ) {
+        return userService.updateProfile(authentication.getName(), request);
     }
 
     // Searches users by login or display name.

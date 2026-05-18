@@ -92,76 +92,93 @@ export default function MessageList({
         return (
           <div
             key={message.id}
-            className={isOwn ? "message-bubble own" : "message-bubble"}
+            className={isOwn ? "message-row own" : "message-row"}
           >
-            <div className="message-meta">
-              <strong>{message.sender.displayName}</strong>
-              <span>{formatDate(message.createdAt)}</span>
-            </div>
-
-            {isEditing ? (
-              <div className="message-edit-box">
-                <textarea
-                  value={editedContent}
-                  onChange={(e) => setEditedContent(e.target.value)}
-                  rows={3}
-                />
-                <div className="message-edit-actions">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={cancelEditing}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="primary-button"
-                    onClick={saveEditing}
-                  >
-                    Save
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className="message-content">{message.content}</p>
-
-                {message.disappearing && (
-                  <span className="message-expire-timer">
-                    disappears in {getRemainingSeconds(message.expiresAt)}s
+            {!isOwn && (
+              <div className="message-avatar">
+                {message.sender.avatarUrl ? (
+                  <img
+                    src={message.sender.avatarUrl}
+                    alt={message.sender.displayName}
+                  />
+                ) : (
+                  <span>
+                    {message.sender.displayName.charAt(0).toUpperCase()}
                   </span>
                 )}
+              </div>
+            )}
 
-                <div className="message-footer">
-                  <div>
-                    {message.edited && (
-                      <span className="message-edited-label">edited</span>
+            <div className={isOwn ? "message-bubble own" : "message-bubble"}>
+              <div className="message-meta">
+                <strong>{message.sender.displayName}</strong>
+                <span>{formatDate(message.createdAt)}</span>
+              </div>
+
+              {isEditing ? (
+                <div className="message-edit-box">
+                  <textarea
+                    value={editedContent}
+                    onChange={(e) => setEditedContent(e.target.value)}
+                    rows={3}
+                  />
+                  <div className="message-edit-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={cancelEditing}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={saveEditing}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="message-content">{message.content}</p>
+
+                  {message.disappearing && (
+                    <span className="message-expire-timer">
+                      disappears in {getRemainingSeconds(message.expiresAt)}s
+                    </span>
+                  )}
+
+                  <div className="message-footer">
+                    <div>
+                      {message.edited && (
+                        <span className="message-edited-label">edited</span>
+                      )}
+                    </div>
+
+                    {isOwn && (
+                      <div className="message-actions">
+                        <button
+                          type="button"
+                          className="message-edit-button"
+                          onClick={() => startEditing(message)}
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          className="message-delete-button"
+                          onClick={() => handleDelete(message.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     )}
                   </div>
-
-                  {isOwn && (
-                    <div className="message-actions">
-                      <button
-                        type="button"
-                        className="message-edit-button"
-                        onClick={() => startEditing(message)}
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        type="button"
-                        className="message-delete-button"
-                        onClick={() => handleDelete(message.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
         );
       })}

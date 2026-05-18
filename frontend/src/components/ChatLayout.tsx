@@ -7,9 +7,19 @@ import ConversationList from "@/components/ConversationList";
 import ConversationView from "@/components/ConversationView";
 import CreateGroupModal from "@/components/CreateGroupModal";
 import ManageGroupModal from "@/components/ManageGroupModal";
+import ProfileModal from "@/components/ProfileModal";
 
 type ChatLayoutProps = {
   currentUser: UserResponse;
+
+  isProfileOpen: boolean;
+  onOpenProfile: () => void;
+  onCloseProfile: () => void;
+  onSaveProfile: (payload: {
+    displayName: string;
+    avatarUrl: string | null;
+  }) => Promise<void>;
+
   searchResults: UserSearchResponse[];
   searchLoading: boolean;
   conversations: ConversationResponse[];
@@ -41,6 +51,12 @@ type ChatLayoutProps = {
 
 export default function ChatLayout({
   currentUser,
+
+  isProfileOpen,
+  onOpenProfile,
+  onCloseProfile,
+  onSaveProfile,
+
   searchResults,
   searchLoading,
   conversations,
@@ -67,12 +83,28 @@ export default function ChatLayout({
     <>
       <section className="chat-shell">
         <header className="chat-topbar">
-          <div>
-            <p className="eyebrow">Best Communicator</p>
-            <h1 className="chat-title">Welcome, {currentUser.displayName}</h1>
+          <div className="topbar-user">
+            <div className="topbar-avatar">
+              {currentUser.avatarUrl ? (
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.displayName}
+                />
+              ) : (
+                <span>{currentUser.displayName.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+
+            <div>
+              <p className="eyebrow">Best Communicator</p>
+              <h1 className="chat-title">Welcome, {currentUser.displayName}</h1>
+            </div>
           </div>
 
           <div className="topbar-actions">
+            <button className="secondary-button" onClick={onOpenProfile}>
+              Profile
+            </button>
             <button className="primary-button" onClick={onOpenCreateGroup}>
               Create group
             </button>
@@ -117,6 +149,12 @@ export default function ChatLayout({
         loading={searchLoading}
         onSearch={onSearchUsers}
         onCreateGroup={onCreateGroup}
+      />
+      <ProfileModal
+        isOpen={isProfileOpen}
+        currentUser={currentUser}
+        onClose={onCloseProfile}
+        onSave={onSaveProfile}
       />
       <ManageGroupModal
         isOpen={isManageGroupOpen}

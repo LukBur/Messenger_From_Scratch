@@ -74,6 +74,25 @@ export async function searchUsers(
   return handleJsonResponse<UserSearchResponse[]>(response);
 }
 
+export async function updateProfile(
+  token: string,
+  payload: {
+    displayName: string;
+    avatarUrl: string | null;
+  },
+): Promise<UserResponse> {
+  const response = await fetch(`${API_URL}/users/me/profile`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return handleJsonResponse<UserResponse>(response);
+}
+
 export async function createPrivateConversation(
   token: string,
   targetUserId: string,

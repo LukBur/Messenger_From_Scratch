@@ -12,7 +12,7 @@ type ConversationListProps = {
 
 function getConversationTitle(
   conversation: ConversationResponse,
-  currentUser: UserResponse
+  currentUser: UserResponse,
 ) {
   if (conversation.type === "GROUP") {
     return conversation.name || "Group conversation";
@@ -20,7 +20,7 @@ function getConversationTitle(
 
   const otherParticipant =
     conversation.participants.find(
-      (participant) => participant.id !== currentUser.id
+      (participant) => participant.id !== currentUser.id,
     ) || conversation.participants[0];
 
   return otherParticipant?.displayName || "Conversation";
@@ -28,7 +28,7 @@ function getConversationTitle(
 
 function getConversationSubtitle(
   conversation: ConversationResponse,
-  currentUser: UserResponse
+  currentUser: UserResponse,
 ) {
   if (conversation.type === "GROUP") {
     return `${conversation.participants.length} members`;
@@ -36,10 +36,26 @@ function getConversationSubtitle(
 
   const otherParticipant =
     conversation.participants.find(
-      (participant) => participant.id !== currentUser.id
+      (participant) => participant.id !== currentUser.id,
     ) || conversation.participants[0];
 
   return otherParticipant ? `@${otherParticipant.login}` : "";
+}
+
+function getConversationAvatar(
+  conversation: ConversationResponse,
+  currentUser: UserResponse,
+) {
+  if (conversation.type === "GROUP") {
+    return null;
+  }
+
+  const otherParticipant =
+    conversation.participants.find(
+      (participant) => participant.id !== currentUser.id,
+    ) || conversation.participants[0];
+
+  return otherParticipant?.avatarUrl || null;
 }
 
 export default function ConversationList({
@@ -56,31 +72,49 @@ export default function ConversationList({
         {conversations.length === 0 ? (
           <p className="muted-text">No conversations yet.</p>
         ) : (
-          conversations.map((conversation) => (
-            <button
-              key={conversation.id}
-              type="button"
-              className={
-                selectedConversationId === conversation.id
-                  ? "conversation-item active"
-                  : "conversation-item"
-              }
-              onClick={() => onSelectConversation(conversation)}
-            >
-              <div className="conversation-item-top">
-                <strong>{getConversationTitle(conversation, currentUser)}</strong>
-                <span className="conversation-login">
-                  {getConversationSubtitle(conversation, currentUser)}
-                </span>
-              </div>
+          conversations.map((conversation) => {
+            const title = getConversationTitle(conversation, currentUser);
+            const subtitle = getConversationSubtitle(conversation, currentUser);
+            const avatarUrl = getConversationAvatar(conversation, currentUser);
 
-              <p className="conversation-preview">
-                {conversation.lastMessage
-                  ? `${conversation.lastMessage.senderDisplayName}: ${conversation.lastMessage.content}`
-                  : "No messages yet"}
-              </p>
-            </button>
-          ))
+            return (
+              <button
+                key={conversation.id}
+                type="button"
+                className={
+                  selectedConversationId === conversation.id
+                    ? "conversation-item active"
+                    : "conversation-item"
+                }
+                onClick={() => onSelectConversation(conversation)}
+              >
+                <div className="conversation-item-content">
+                  <div className="conversation-avatar">
+                    {conversation.type === "GROUP" ? (
+                      <span>G</span>
+                    ) : avatarUrl ? (
+                      <img src={avatarUrl} alt={title} />
+                    ) : (
+                      <span>{title.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+
+                  <div className="conversation-item-body">
+                    <div className="conversation-item-top">
+                      <strong>{title}</strong>
+                      <span className="conversation-login">{subtitle}</span>
+                    </div>
+
+                    <p className="conversation-preview">
+                      {conversation.lastMessage
+                        ? `${conversation.lastMessage.senderDisplayName}: ${conversation.lastMessage.content}`
+                        : "No messages yet"}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            );
+          })
         )}
       </div>
     </section>
