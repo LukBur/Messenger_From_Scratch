@@ -1,6 +1,7 @@
 package pl.communicator.backend.controller;
 
 import jakarta.validation.Valid;
+import pl.communicator.backend.dto.ChangePasswordRequest;
 import pl.communicator.backend.dto.UpdateProfileRequest;
 import pl.communicator.backend.dto.UserResponse;
 import pl.communicator.backend.dto.UserSearchResponse;
@@ -53,6 +54,14 @@ public class UserController {
             Authentication authentication
     ) {
         return userService.updateProfile(authentication.getName(), request);
+    }
+
+    @PutMapping("/me/password")
+    public void changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication
+    ) {
+        userService.changePassword(authentication.getName(), request);
     }
 
     // Searches users by login or display name.

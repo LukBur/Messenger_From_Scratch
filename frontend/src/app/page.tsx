@@ -15,6 +15,7 @@ import {
   removeParticipantFromGroup,
   searchUsers,
   updateGroupName,
+  changePassword,
   updateProfile,
 } from "@/lib/api";
 import { ConversationResponse } from "@/types/conversation";
@@ -169,6 +170,24 @@ export default function HomePage() {
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Could not update profile",
+      );
+    }
+  };
+
+  const handleChangePassword = async (payload: {
+    currentPassword: string;
+    newPassword: string;
+  }) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setMessage("");
+      await changePassword(token, payload);
+      setMessage("Password changed successfully");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not change password",
       );
     }
   };
@@ -392,6 +411,7 @@ export default function HomePage() {
               onUpdateGroupName={handleUpdateGroupName}
               onAddParticipant={handleAddParticipant}
               onRemoveParticipant={handleRemoveParticipant}
+              onChangePassword={handleChangePassword}
               onLogout={handleLogout}
             />
             {message && <p className="status-message">{message}</p>}

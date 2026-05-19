@@ -46,6 +46,10 @@ type ChatLayoutProps = {
     userId: string,
   ) => Promise<void>;
 
+  onChangePassword: (payload: {
+    currentPassword: string;
+    newPassword: string;
+  }) => Promise<void>;
   onLogout: () => void;
 };
 
@@ -76,7 +80,7 @@ export default function ChatLayout({
   onUpdateGroupName,
   onAddParticipant,
   onRemoveParticipant,
-
+  onChangePassword,
   onLogout,
 }: ChatLayoutProps) {
   return (
@@ -155,6 +159,7 @@ export default function ChatLayout({
         currentUser={currentUser}
         onClose={onCloseProfile}
         onSave={onSaveProfile}
+        onChangePassword={onChangePassword}
       />
       <ManageGroupModal
         isOpen={isManageGroupOpen}

@@ -93,6 +93,30 @@ export async function updateProfile(
   return handleJsonResponse<UserResponse>(response);
 }
 
+export async function changePassword(
+  token: string,
+  payload: {
+    currentPassword: string;
+    newPassword: string;
+  },
+): Promise<void> {
+  const response = await fetch(`${API_URL}/users/me/password`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const errorMessage =
+      data?.message || `Request failed with status ${response.status}`;
+    throw new Error(errorMessage);
+  }
+}
+
 export async function createPrivateConversation(
   token: string,
   targetUserId: string,

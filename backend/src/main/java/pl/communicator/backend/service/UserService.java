@@ -1,6 +1,8 @@
 package pl.communicator.backend.service;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import pl.communicator.backend.dto.ChangePasswordRequest;
 import pl.communicator.backend.dto.UpdateProfileRequest;
 import pl.communicator.backend.dto.UserResponse;
 import pl.communicator.backend.exception.ResourceNotFoundException;
@@ -11,9 +13,11 @@ import pl.communicator.backend.repository.UserRepository;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public UserResponse getCurrentUser(String currentLogin) {
@@ -45,6 +49,28 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
         return mapToResponse(savedUser);
+    }
+
+    public void changePassword(String currentLogin, ChangePasswordRequest request) {
+        User user = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+
+        String trimmedNewPassword = request.getNewPassword().trim();
+
+        if (trimmedNewPassword.length() < 6) {
+            throw new IllegalArgumentException("New password must be at least 6 characters long");
+        }
+
+        if (passwordEncoder.matches(trimmedNewPassword, user.getPassword())) {
+            throw new IllegalArgumentException("New password must be different from the current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(trimmedNewPassword));
+        userRepository.save(user);
     }
 
     private UserResponse mapToResponse(User user) {

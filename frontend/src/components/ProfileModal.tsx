@@ -11,6 +11,10 @@ type ProfileModalProps = {
     displayName: string;
     avatarUrl: string | null;
   }) => Promise<void>;
+  onChangePassword: (payload: {
+    currentPassword: string;
+    newPassword: string;
+  }) => Promise<void>;
 };
 
 export default function ProfileModal({
@@ -18,18 +22,23 @@ export default function ProfileModal({
   currentUser,
   onClose,
   onSave,
+  onChangePassword,
 }: ProfileModalProps) {
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
     if (!currentUser) return;
 
     setDisplayName(currentUser.displayName);
     setAvatarUrl(currentUser.avatarUrl || "");
-  }, [currentUser]);
+    setCurrentPassword("");
+    setNewPassword("");
+  }, [currentUser, isOpen]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     await onSave({
@@ -38,6 +47,18 @@ export default function ProfileModal({
     });
 
     onClose();
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    await onChangePassword({
+      currentPassword,
+      newPassword,
+    });
+
+    setCurrentPassword("");
+    setNewPassword("");
   };
 
   if (!isOpen || !currentUser) return null;
@@ -56,7 +77,7 @@ export default function ProfileModal({
           </button>
         </div>
 
-        <form className="group-form" onSubmit={handleSubmit}>
+        <form className="group-form" onSubmit={handleProfileSubmit}>
           <div className="form-group">
             <label>Email</label>
             <input type="text" value={currentUser.email} disabled />
@@ -96,6 +117,34 @@ export default function ProfileModal({
             Save profile
           </button>
         </form>
+
+        <section className="manage-group-section">
+          <h3 className="section-title">Change password</h3>
+
+          <form className="group-form" onSubmit={handlePasswordSubmit}>
+            <div className="form-group">
+              <label>Current password</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>New password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+
+            <button className="primary-button" type="submit">
+              Change password
+            </button>
+          </form>
+        </section>
       </div>
     </div>
   );
