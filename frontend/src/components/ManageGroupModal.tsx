@@ -196,6 +196,7 @@ export default function ManageGroupModal({
 
               <form className="group-form" onSubmit={handleTransferOwnership}>
                 <select
+                  className="group-owner-select"
                   value={selectedNewOwnerId}
                   onChange={(e) => setSelectedNewOwnerId(e.target.value)}
                 >

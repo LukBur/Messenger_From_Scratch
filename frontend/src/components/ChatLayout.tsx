@@ -116,11 +116,11 @@ export default function ChatLayout({
           </div>
 
           <div className="topbar-actions">
-            <button className="secondary-button" onClick={onOpenProfile}>
-              Profile
-            </button>
             <button className="primary-button" onClick={onOpenCreateGroup}>
               Create group
+            </button>
+            <button className="secondary-button" onClick={onOpenProfile}>
+              Profile
             </button>
             <button className="secondary-button" onClick={onLogout}>
               Log out
