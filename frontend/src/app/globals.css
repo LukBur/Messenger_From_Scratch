@@ -713,3 +713,18 @@ input {
   height: 100%;
   object-fit: cover;
 }
+
+.danger-zone {
+  margin-top: 28px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.danger-button {
+  border: none;
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: #b91c1c;
+  color: white;
+}

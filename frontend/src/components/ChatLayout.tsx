@@ -51,6 +51,13 @@ type ChatLayoutProps = {
     newPassword: string;
   }) => Promise<void>;
   onLogout: () => void;
+
+  onLeaveGroup: (conversationId: string) => Promise<void>;
+  onTransferOwnership: (
+    conversationId: string,
+    newOwnerId: string,
+  ) => Promise<void>;
+  onDeleteGroup: (conversationId: string) => Promise<void>;
 };
 
 export default function ChatLayout({
@@ -82,6 +89,9 @@ export default function ChatLayout({
   onRemoveParticipant,
   onChangePassword,
   onLogout,
+  onLeaveGroup,
+  onTransferOwnership,
+  onDeleteGroup,
 }: ChatLayoutProps) {
   return (
     <>
@@ -172,6 +182,9 @@ export default function ChatLayout({
         onUpdateGroupName={onUpdateGroupName}
         onAddParticipant={onAddParticipant}
         onRemoveParticipant={onRemoveParticipant}
+        onLeaveGroup={onLeaveGroup}
+        onTransferOwnership={onTransferOwnership}
+        onDeleteGroup={onDeleteGroup}
       />
     </>
   );

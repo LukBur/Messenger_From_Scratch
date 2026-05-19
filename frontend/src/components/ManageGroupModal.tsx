@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConversationResponse } from "@/types/conversation";
 import { UserResponse, UserSearchResponse } from "@/types/user";
 
@@ -18,6 +18,12 @@ type ManageGroupModalProps = {
     conversationId: string,
     userId: string,
   ) => Promise<void>;
+  onLeaveGroup: (conversationId: string) => Promise<void>;
+  onTransferOwnership: (
+    conversationId: string,
+    newOwnerId: string,
+  ) => Promise<void>;
+  onDeleteGroup: (conversationId: string) => Promise<void>;
 };
 
 export default function ManageGroupModal({
@@ -31,12 +37,21 @@ export default function ManageGroupModal({
   onUpdateGroupName,
   onAddParticipant,
   onRemoveParticipant,
+  onLeaveGroup,
+  onTransferOwnership,
+  onDeleteGroup,
 }: ManageGroupModalProps) {
   const [query, setQuery] = useState("");
   const [groupName, setGroupName] = useState(conversation?.name || "");
+  const [selectedNewOwnerId, setSelectedNewOwnerId] = useState("");
 
   const isGroup = conversation?.type === "GROUP";
   const isOwner = conversation?.ownerId === currentUser.id;
+
+  useEffect(() => {
+    setGroupName(conversation?.name || "");
+    setSelectedNewOwnerId("");
+  }, [conversation]);
 
   const participantIds = useMemo(
     () => new Set(conversation?.participants.map((p) => p.id) || []),
@@ -46,6 +61,14 @@ export default function ManageGroupModal({
   const searchableUsers = useMemo(() => {
     return searchResults.filter((user) => !participantIds.has(user.id));
   }, [searchResults, participantIds]);
+
+  const transferableParticipants = useMemo(() => {
+    return (
+      conversation?.participants.filter(
+        (participant) => participant.id !== conversation.ownerId,
+      ) || []
+    );
+  }, [conversation]);
 
   if (!isOpen || !conversation || !isGroup) return null;
 
@@ -59,6 +82,30 @@ export default function ManageGroupModal({
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     await onSearchUsers(query);
+  };
+
+  const handleTransferOwnership = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedNewOwnerId) return;
+
+    await onTransferOwnership(conversation.id, selectedNewOwnerId);
+    setSelectedNewOwnerId("");
+  };
+
+  const handleLeaveGroup = async () => {
+    await onLeaveGroup(conversation.id);
+    onClose();
+  };
+
+  const handleDeleteGroup = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this group?",
+    );
+
+    if (!confirmed) return;
+
+    await onDeleteGroup(conversation.id);
+    onClose();
   };
 
   return (
@@ -114,6 +161,18 @@ export default function ManageGroupModal({
           </div>
         </section>
 
+        {!isOwner && (
+          <section className="manage-group-section">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleLeaveGroup}
+            >
+              Leave group
+            </button>
+          </section>
+        )}
+
         {isOwner && (
           <>
             <section className="manage-group-section">
@@ -128,6 +187,32 @@ export default function ManageGroupModal({
                 />
                 <button className="primary-button" type="submit">
                   Save name
+                </button>
+              </form>
+            </section>
+
+            <section className="manage-group-section">
+              <h3 className="section-title">Transfer ownership</h3>
+
+              <form className="group-form" onSubmit={handleTransferOwnership}>
+                <select
+                  value={selectedNewOwnerId}
+                  onChange={(e) => setSelectedNewOwnerId(e.target.value)}
+                >
+                  <option value="">Select new owner</option>
+                  {transferableParticipants.map((participant) => (
+                    <option key={participant.id} value={participant.id}>
+                      {participant.displayName} (@{participant.login})
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  className="secondary-button"
+                  type="submit"
+                  disabled={!selectedNewOwnerId}
+                >
+                  Transfer ownership
                 </button>
               </form>
             </section>
@@ -176,13 +261,19 @@ export default function ManageGroupModal({
                 )}
               </div>
             </section>
-          </>
-        )}
 
-        {!isOwner && (
-          <p className="muted-text">
-            Only the group owner can manage this group.
-          </p>
+            <section className="manage-group-section danger-zone">
+              <h3 className="section-title">Danger zone</h3>
+
+              <button
+                type="button"
+                className="danger-button"
+                onClick={handleDeleteGroup}
+              >
+                Delete group
+              </button>
+            </section>
+          </>
         )}
       </div>
     </div>

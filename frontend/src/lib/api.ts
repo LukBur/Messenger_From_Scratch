@@ -295,3 +295,64 @@ export async function deleteMessage(
     throw new Error(errorMessage);
   }
 }
+
+export async function leaveGroup(
+  token: string,
+  conversationId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/group/leave`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const errorMessage =
+      data?.message || `Request failed with status ${response.status}`;
+    throw new Error(errorMessage);
+  }
+}
+
+export async function transferGroupOwnership(
+  token: string,
+  conversationId: string,
+  newOwnerId: string,
+): Promise<ConversationResponse> {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/group/owner`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ newOwnerId }),
+    },
+  );
+
+  return handleJsonResponse<ConversationResponse>(response);
+}
+
+export async function deleteGroup(
+  token: string,
+  conversationId: string,
+): Promise<void> {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const errorMessage =
+      data?.message || `Request failed with status ${response.status}`;
+    throw new Error(errorMessage);
+  }
+}

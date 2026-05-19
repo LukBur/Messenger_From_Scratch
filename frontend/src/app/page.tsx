@@ -6,16 +6,19 @@ import AuthForm from "@/components/AuthForm";
 import ChatLayout from "@/components/ChatLayout";
 import {
   addParticipantToGroup,
+  changePassword,
   createGroupConversation,
   createPrivateConversation,
+  deleteGroup,
   getCurrentUser,
   getMyConversations,
+  leaveGroup,
   loginUser,
   registerUser,
   removeParticipantFromGroup,
   searchUsers,
+  transferGroupOwnership,
   updateGroupName,
-  changePassword,
   updateProfile,
 } from "@/lib/api";
 import { ConversationResponse } from "@/types/conversation";
@@ -23,6 +26,8 @@ import { UserSearchResponse, UserResponse } from "@/types/user";
 import {
   connectStompClient,
   disconnectStompClient,
+  subscribeToConversationDeleted,
+  subscribeToConversationManagementUpdates,
   subscribeToConversationUpdates,
 } from "@/lib/websocket";
 
@@ -36,18 +41,25 @@ export default function HomePage() {
 
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isManageGroupOpen, setIsManageGroupOpen] = useState(false);
-
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
   const [searchResults, setSearchResults] = useState<UserSearchResponse[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [conversations, setConversations] = useState<ConversationResponse[]>([]);
+  const [conversations, setConversations] = useState<ConversationResponse[]>(
+    [],
+  );
   const [selectedConversation, setSelectedConversation] =
     useState<ConversationResponse | null>(null);
 
-  const conversationUpdatesSubscriptionRef =
+  const conversationUpdatesSubscriptionRef = useRef<StompSubscription | null>(
+    null,
+  );
+  const conversationManagementSubscriptionRef =
     useRef<StompSubscription | null>(null);
+  const conversationDeletedSubscriptionRef = useRef<StompSubscription | null>(
+    null,
+  );
 
   const selectedConversationIdRef = useRef<string | null>(null);
 
@@ -76,7 +88,7 @@ export default function HomePage() {
         setSelectedConversation(data[0]);
       }
     },
-    []
+    [],
   );
 
   const refreshConversations = useCallback(async () => {
@@ -85,6 +97,23 @@ export default function HomePage() {
 
     await loadConversations(token);
   }, [loadConversations]);
+
+  const clearUserSubscriptions = () => {
+    if (conversationUpdatesSubscriptionRef.current) {
+      conversationUpdatesSubscriptionRef.current.unsubscribe();
+      conversationUpdatesSubscriptionRef.current = null;
+    }
+
+    if (conversationManagementSubscriptionRef.current) {
+      conversationManagementSubscriptionRef.current.unsubscribe();
+      conversationManagementSubscriptionRef.current = null;
+    }
+
+    if (conversationDeletedSubscriptionRef.current) {
+      conversationDeletedSubscriptionRef.current.unsubscribe();
+      conversationDeletedSubscriptionRef.current = null;
+    }
+  };
 
   const fetchCurrentUser = useCallback(
     async (token: string) => {
@@ -101,43 +130,62 @@ export default function HomePage() {
           async () => {
             console.log("WebSocket connected");
 
-            if (conversationUpdatesSubscriptionRef.current) {
-              conversationUpdatesSubscriptionRef.current.unsubscribe();
-              conversationUpdatesSubscriptionRef.current = null;
-            }
+            clearUserSubscriptions();
 
-            const subscription = await subscribeToConversationUpdates(
+            const updatesSubscription = await subscribeToConversationUpdates(
               user.id,
               () => {
                 void refreshConversations();
-              }
+              },
             );
+            conversationUpdatesSubscriptionRef.current = updatesSubscription;
 
-            conversationUpdatesSubscriptionRef.current = subscription;
+            const managementSubscription =
+              await subscribeToConversationManagementUpdates(user.id, () => {
+                void refreshConversations();
+              });
+            conversationManagementSubscriptionRef.current =
+              managementSubscription;
+
+            const deletedSubscription = await subscribeToConversationDeleted(
+              user.id,
+              (event) => {
+                setConversations((prev) =>
+                  prev.filter(
+                    (conversation) => conversation.id !== event.conversationId,
+                  ),
+                );
+
+                setSelectedConversation((prev) =>
+                  prev?.id === event.conversationId ? null : prev,
+                );
+
+                setIsManageGroupOpen(false);
+              },
+            );
+            conversationDeletedSubscriptionRef.current = deletedSubscription;
           },
           (error) => {
             console.error(error);
-          }
+          },
         );
       } catch (error) {
         localStorage.removeItem("token");
+        clearUserSubscriptions();
         setCurrentUser(null);
         setConversations([]);
         setSelectedConversation(null);
         setMessage(
-          error instanceof Error ? error.message : "Could not load user data"
+          error instanceof Error ? error.message : "Could not load user data",
         );
       } finally {
         setLoadingUser(false);
       }
     },
-    [loadConversations, refreshConversations]
+    [loadConversations, refreshConversations],
   );
 
-  const handleLogin = async (payload: {
-    login: string;
-    password: string;
-  }) => {
+  const handleLogin = async (payload: { login: string; password: string }) => {
     try {
       setLoading(true);
       setMessage("");
@@ -148,6 +196,28 @@ export default function HomePage() {
       await fetchCurrentUser(data.token);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (payload: {
+    email: string;
+    login: string;
+    displayName: string;
+    password: string;
+  }) => {
+    try {
+      setLoading(true);
+      setMessage("");
+
+      const data = await registerUser(payload);
+      setMessage(data.message || "Registration successful");
+      setMode("login");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Registration failed",
+      );
     } finally {
       setLoading(false);
     }
@@ -197,26 +267,6 @@ export default function HomePage() {
     setSearchResults([]);
   };
 
-  const handleRegister = async (payload: {
-    email: string;
-    login: string;
-    displayName: string;
-    password: string;
-  }) => {
-    try {
-      setLoading(true);
-      setMessage("");
-
-      const data = await registerUser(payload);
-      setMessage(data.message || "Registration successful");
-      setMode("login");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Registration failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSearchUsers = async (query: string) => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -246,7 +296,9 @@ export default function HomePage() {
       setSearchResults([]);
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Could not create conversation"
+        error instanceof Error
+          ? error.message
+          : "Could not create conversation",
       );
     }
   };
@@ -264,9 +316,10 @@ export default function HomePage() {
       const conversation = await createGroupConversation(token, payload);
       await loadConversations(token, conversation.id);
       setSearchResults([]);
+      setIsCreateGroupOpen(false);
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Could not create group"
+        error instanceof Error ? error.message : "Could not create group",
       );
     }
   };
@@ -325,12 +378,68 @@ export default function HomePage() {
     }
   };
 
-  const handleLogout = () => {
-    if (conversationUpdatesSubscriptionRef.current) {
-      conversationUpdatesSubscriptionRef.current.unsubscribe();
-      conversationUpdatesSubscriptionRef.current = null;
-    }
+  const handleLeaveGroup = async (conversationId: string) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
+    try {
+      setMessage("");
+      await leaveGroup(token, conversationId);
+
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(null);
+        setIsManageGroupOpen(false);
+      }
+
+      await loadConversations(token);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not leave group",
+      );
+    }
+  };
+
+  const handleTransferOwnership = async (
+    conversationId: string,
+    newOwnerId: string,
+  ) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setMessage("");
+      await transferGroupOwnership(token, conversationId, newOwnerId);
+      await loadConversations(token, conversationId);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not transfer ownership",
+      );
+    }
+  };
+
+  const handleDeleteGroup = async (conversationId: string) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setMessage("");
+      await deleteGroup(token, conversationId);
+
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(null);
+        setIsManageGroupOpen(false);
+      }
+
+      await loadConversations(token);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not delete group",
+      );
+    }
+  };
+
+  const handleLogout = () => {
+    clearUserSubscriptions();
     localStorage.removeItem("token");
     disconnectStompClient();
 
@@ -338,6 +447,9 @@ export default function HomePage() {
     setSearchResults([]);
     setConversations([]);
     setSelectedConversation(null);
+    setIsCreateGroupOpen(false);
+    setIsManageGroupOpen(false);
+    setIsProfileOpen(false);
     setMessage("Logged out");
     setMode("login");
   };
@@ -353,11 +465,7 @@ export default function HomePage() {
     void fetchCurrentUser(savedToken);
 
     return () => {
-      if (conversationUpdatesSubscriptionRef.current) {
-        conversationUpdatesSubscriptionRef.current.unsubscribe();
-        conversationUpdatesSubscriptionRef.current = null;
-      }
-
+      clearUserSubscriptions();
       disconnectStompClient();
     };
   }, [fetchCurrentUser]);
@@ -393,6 +501,7 @@ export default function HomePage() {
               onOpenProfile={() => setIsProfileOpen(true)}
               onCloseProfile={() => setIsProfileOpen(false)}
               onSaveProfile={handleSaveProfile}
+              onChangePassword={handleChangePassword}
               searchResults={searchResults}
               searchLoading={searchLoading}
               conversations={conversations}
@@ -411,7 +520,9 @@ export default function HomePage() {
               onUpdateGroupName={handleUpdateGroupName}
               onAddParticipant={handleAddParticipant}
               onRemoveParticipant={handleRemoveParticipant}
-              onChangePassword={handleChangePassword}
+              onLeaveGroup={handleLeaveGroup}
+              onTransferOwnership={handleTransferOwnership}
+              onDeleteGroup={handleDeleteGroup}
               onLogout={handleLogout}
             />
             {message && <p className="status-message">{message}</p>}

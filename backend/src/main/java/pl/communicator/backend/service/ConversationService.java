@@ -259,6 +259,92 @@ public class ConversationService {
         return mapToResponse(updatedConversation);
     }
 
+    public void leaveGroup(String currentLogin, String conversationId) {
+        User currentUser = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+
+        validateGroupParticipation(currentUser, conversation);
+
+        if (currentUser.getId().equals(conversation.getOwnerId())) {
+            throw new IllegalArgumentException("Group owner must transfer ownership before leaving");
+        }
+
+        conversation.getParticipantIds().remove(currentUser.getId());
+
+        Conversation updatedConversation = conversationRepository.save(conversation);
+
+        sendConversationUpdatedEvent(updatedConversation);
+
+        messagingTemplate.convertAndSend(
+                "/topic/users/" + currentUser.getId() + "/conversation-deleted",
+                new ConversationDeletedEvent(conversationId)
+        );
+    }
+
+    public ConversationResponse transferGroupOwnership(
+            String currentLogin,
+            String conversationId,
+            TransferGroupOwnershipRequest request
+    ) {
+        User currentUser = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+
+        validateGroupOwnership(currentUser, conversation);
+
+        String newOwnerId = request.getNewOwnerId();
+
+        if (!conversation.getParticipantIds().contains(newOwnerId)) {
+            throw new IllegalArgumentException("New owner must be a participant of the group");
+        }
+
+        if (newOwnerId.equals(conversation.getOwnerId())) {
+            throw new IllegalArgumentException("Selected user is already the owner");
+        }
+
+        conversation.setOwnerId(newOwnerId);
+        Conversation updatedConversation = conversationRepository.save(conversation);
+
+        sendConversationUpdatedEvent(updatedConversation);
+
+        return mapToResponse(updatedConversation);
+    }
+
+    public void deleteGroup(String currentLogin, String conversationId) {
+        User currentUser = userRepository.findByLogin(currentLogin)
+                .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+
+        validateGroupOwnership(currentUser, conversation);
+
+        for (String participantId : conversation.getParticipantIds()) {
+            messagingTemplate.convertAndSend(
+                    "/topic/users/" + participantId + "/conversation-deleted",
+                    new ConversationDeletedEvent(conversation.getId())
+            );
+        }
+
+        messageRepository.deleteByConversationId(conversation.getId());
+        conversationRepository.delete(conversation);
+    }
+
+    private void validateGroupParticipation(User currentUser, Conversation conversation) {
+        if (conversation.getType() != ConversationType.GROUP) {
+            throw new IllegalArgumentException("This operation is only allowed for group conversations");
+        }
+
+        if (!conversation.getParticipantIds().contains(currentUser.getId())) {
+            throw new IllegalArgumentException("You are not a participant of this group");
+        }
+    }
+
     private void validateGroupOwnership(User currentUser, Conversation conversation) {
         if (conversation.getType() != ConversationType.GROUP) {
             throw new IllegalArgumentException("This operation is only allowed for group conversations");

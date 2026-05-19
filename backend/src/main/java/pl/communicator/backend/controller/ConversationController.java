@@ -63,6 +63,31 @@ public class ConversationController {
         return conversationService.removeParticipantFromGroup(authentication.getName(), conversationId, request);
     }
 
+    @PostMapping("/{conversationId}/group/leave")
+    public void leaveGroup(
+            @PathVariable String conversationId,
+            Authentication authentication
+    ) {
+        conversationService.leaveGroup(authentication.getName(), conversationId);
+    }
+
+    @PutMapping("/{conversationId}/group/owner")
+    public ConversationResponse transferGroupOwnership(
+            @PathVariable String conversationId,
+            @Valid @RequestBody TransferGroupOwnershipRequest request,
+            Authentication authentication
+    ) {
+        return conversationService.transferGroupOwnership(authentication.getName(), conversationId, request);
+    }
+
+    @DeleteMapping("/{conversationId}")
+    public void deleteGroup(
+            @PathVariable String conversationId,
+            Authentication authentication
+    ) {
+        conversationService.deleteGroup(authentication.getName(), conversationId);
+    }
+
     // Returns all conversations that belong to the currently authenticated user.
     @GetMapping("/my")
     public List<ConversationResponse> getMyConversations(Authentication authentication) {

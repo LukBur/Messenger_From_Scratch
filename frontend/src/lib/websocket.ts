@@ -1,7 +1,11 @@
 import { Client, IMessage, StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { MessageResponse, MessageDeletedEvent } from "@/types/message";
-import { ConversationCreatedEvent, ConversationUpdatedEvent } from "@/types/conversation";
+import {
+  ConversationCreatedEvent,
+  ConversationUpdatedEvent,
+  ConversationDeletedEvent,
+} from "@/types/conversation";
 
 let stompClient: Client | null = null;
 let isDisconnecting = false;
@@ -146,6 +150,31 @@ export async function subscribeToDeletedMessages(
     (frame: IMessage) => {
       const body = JSON.parse(frame.body) as MessageDeletedEvent;
       onDelete(body);
+    },
+  );
+}
+
+export async function subscribeToConversationDeleted(
+  userId: string,
+  onEvent: (event: ConversationDeletedEvent) => void,
+): Promise<StompSubscription | null> {
+  if (!stompClient) {
+    return null;
+  }
+
+  if (!stompClient.connected) {
+    await waitForConnection(stompClient, 3000);
+  }
+
+  if (!stompClient.connected) {
+    return null;
+  }
+
+  return stompClient.subscribe(
+    `/topic/users/${userId}/conversation-deleted`,
+    (frame: IMessage) => {
+      const body = JSON.parse(frame.body) as ConversationDeletedEvent;
+      onEvent(body);
     },
   );
 }
