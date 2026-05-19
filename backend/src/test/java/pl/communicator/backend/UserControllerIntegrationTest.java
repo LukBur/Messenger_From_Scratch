@@ -21,6 +21,9 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -163,5 +166,200 @@ class UserControllerIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));
+    }
+
+    @Test
+    void shouldUpdateProfileSuccessfully() throws Exception {
+        String token = registerAndLogin(
+                "dominik@example.com",
+                "dominik123",
+                "Dominik",
+                "password123"
+        );
+
+        String requestBody = """
+                {
+                  "displayName": "Dominik Updated",
+                  "avatarUrl": "https://i.pravatar.cc/150?img=12"
+                }
+                """;
+
+        mockMvc.perform(put("/api/users/me/profile")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Dominik Updated"))
+                .andExpect(jsonPath("$.avatarUrl").value("https://i.pravatar.cc/150?img=12"))
+                .andExpect(jsonPath("$.login").value("dominik123"))
+                .andExpect(jsonPath("$.email").value("dominik@example.com"));
+    }
+
+    @Test
+    void shouldSetAvatarUrlToNullWhenEmptyStringProvided() throws Exception {
+        String token = registerAndLogin(
+                "dominik@example.com",
+                "dominik123",
+                "Dominik",
+                "password123"
+        );
+
+        String requestBody = """
+                {
+                  "displayName": "Dominik Updated",
+                  "avatarUrl": ""
+                }
+                """;
+
+        mockMvc.perform(put("/api/users/me/profile")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Dominik Updated"))
+                .andExpect(jsonPath("$.avatarUrl").doesNotExist());
+    }
+
+    @Test
+    void shouldReturnUnauthorizedForUpdateProfileWithoutToken() throws Exception {
+        String requestBody = """
+                {
+                  "displayName": "Dominik Updated",
+                  "avatarUrl": "https://i.pravatar.cc/150?img=12"
+                }
+                """;
+
+        mockMvc.perform(put("/api/users/me/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldChangePasswordSuccessfully() throws Exception {
+        String token = registerAndLogin(
+                "dominik@example.com",
+                "dominik123",
+                "Dominik",
+                "password123"
+        );
+
+        String changePasswordBody = """
+                {
+                  "currentPassword": "password123",
+                  "newPassword": "newPassword123"
+                }
+                """;
+
+        mockMvc.perform(put("/api/users/me/password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(changePasswordBody))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "login": "dominik123",
+                                  "password": "password123"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "login": "dominik123",
+                                  "password": "newPassword123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenCurrentPasswordIsIncorrect() throws Exception {
+        String token = registerAndLogin(
+                "dominik@example.com",
+                "dominik123",
+                "Dominik",
+                "password123"
+        );
+
+        String requestBody = """
+                {
+                  "currentPassword": "wrongPassword",
+                  "newPassword": "newPassword123"
+                }
+                """;
+
+        mockMvc.perform(put("/api/users/me/password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenNewPasswordIsTooShort() throws Exception {
+        String token = registerAndLogin(
+                "dominik@example.com",
+                "dominik123",
+                "Dominik",
+                "password123"
+        );
+
+        String requestBody = """
+                {
+                  "currentPassword": "password123",
+                  "newPassword": "123"
+                }
+                """;
+
+        mockMvc.perform(put("/api/users/me/password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenNewPasswordIsSameAsCurrentPassword() throws Exception {
+        String token = registerAndLogin(
+                "dominik@example.com",
+                "dominik123",
+                "Dominik",
+                "password123"
+        );
+
+        String requestBody = """
+                {
+                  "currentPassword": "password123",
+                  "newPassword": "password123"
+                }
+                """;
+
+        mockMvc.perform(put("/api/users/me/password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnUnauthorizedForChangePasswordWithoutToken() throws Exception {
+        String requestBody = """
+                {
+                  "currentPassword": "password123",
+                  "newPassword": "newPassword123"
+                }
+                """;
+
+        mockMvc.perform(put("/api/users/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isUnauthorized());
     }
 }

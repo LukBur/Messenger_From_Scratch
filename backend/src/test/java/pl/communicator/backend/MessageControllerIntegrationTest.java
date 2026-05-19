@@ -27,6 +27,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -110,6 +112,20 @@ class MessageControllerIntegrationTest {
         conversation.setCreatedAt(Instant.now());
         conversation.setLastActivityAt(now);
         conversation.setLastMessageId(null);
+        return conversationRepository.save(conversation);
+    }
+
+    private Conversation createGroupConversation(User owner, List<User> participants, String name) {
+        Conversation conversation = new Conversation();
+        conversation.setType(ConversationType.GROUP);
+        conversation.setName(name);
+        conversation.setOwnerId(owner.getId());
+        conversation.setParticipantIds(participants.stream().map(User::getId).toList());
+        conversation.setCreatedBy(owner.getId());
+        conversation.setCreatedAt(Instant.now());
+        conversation.setLastActivityAt(conversation.getCreatedAt());
+        conversation.setLastMessageId(null);
+
         return conversationRepository.save(conversation);
     }
 
@@ -251,5 +267,264 @@ class MessageControllerIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("You are not a participant of this conversation"));
+    }
+
+    @Test
+    void shouldEditMessageSuccessfully() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        User janek = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        Conversation conversation = createPrivateConversation(janek, adam);
+
+        Message message = new Message();
+        message.setConversationId(conversation.getId());
+        message.setSenderId(janek.getId());
+        message.setContent("Old content");
+        message.setCreatedAt(Instant.now());
+        message.setEdited(false);
+        message.setEditedAt(null);
+        message = messageRepository.save(message);
+
+        Map<String, String> request = Map.of(
+                "content", "Updated content"
+        );
+
+        mockMvc.perform(put("/api/messages/" + message.getId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(message.getId()))
+                .andExpect(jsonPath("$.content").value("Updated content"))
+                .andExpect(jsonPath("$.edited").value(true))
+                .andExpect(jsonPath("$.editedAt").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenEditingOtherUsersMessage() throws Exception {
+        String janekToken = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        String adamToken = registerAndLogin("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        User janek = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = userRepository.findByLogin("adam123").orElseThrow();
+
+        Conversation conversation = createPrivateConversation(janek, adam);
+
+        Message message = new Message();
+        message.setConversationId(conversation.getId());
+        message.setSenderId(adam.getId());
+        message.setContent("Adam message");
+        message.setCreatedAt(Instant.now());
+        message.setEdited(false);
+        message.setEditedAt(null);
+        messageRepository.save(message);
+
+        Map<String, String> request = Map.of(
+                "content", "Illegal edit"
+        );
+
+        mockMvc.perform(put("/api/messages/" + message.getId())
+                        .header("Authorization", "Bearer " + janekToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldSendDisappearingMessageSuccessfully() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        User janek = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        Conversation conversation = createPrivateConversation(janek, adam);
+
+        Map<String, Object> request = Map.of(
+                "conversationId", conversation.getId(),
+                "content", "This will disappear",
+                "disappearAfterSeconds", 30
+        );
+
+        mockMvc.perform(post("/api/messages")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("This will disappear"))
+                .andExpect(jsonPath("$.disappearing").value(true))
+                .andExpect(jsonPath("$.expiresAt").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturnMessageWithExpiresAtWhenDisappearingMessageSent() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        User janek = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        Conversation conversation = createPrivateConversation(janek, adam);
+
+        Map<String, Object> request = Map.of(
+                "conversationId", conversation.getId(),
+                "content", "Short lived",
+                "disappearAfterSeconds", 10
+        );
+
+        mockMvc.perform(post("/api/messages")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.disappearing").value(true))
+                .andExpect(jsonPath("$.expiresAt").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenEditingExpiredMessage() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        User janek = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        Conversation conversation = createPrivateConversation(janek, adam);
+
+        Message message = new Message();
+        message.setConversationId(conversation.getId());
+        message.setSenderId(janek.getId());
+        message.setContent("Expired");
+        message.setCreatedAt(Instant.now().minusSeconds(20));
+        message.setEdited(false);
+        message.setEditedAt(null);
+        message.setDisappearing(true);
+        message.setExpiresAt(Instant.now().minusSeconds(5));
+        message = messageRepository.save(message);
+
+        Map<String, String> request = Map.of(
+                "content", "Updated expired"
+        );
+
+        mockMvc.perform(put("/api/messages/" + message.getId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldDeleteOwnMessageSuccessfully() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        User janek = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        Conversation conversation = createPrivateConversation(janek, adam);
+
+        Message message = new Message();
+        message.setConversationId(conversation.getId());
+        message.setSenderId(janek.getId());
+        message.setContent("Delete me");
+        message.setCreatedAt(Instant.now());
+        message.setEdited(false);
+        message.setEditedAt(null);
+        message = messageRepository.save(message);
+
+        mockMvc.perform(delete("/api/messages/" + message.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        org.junit.jupiter.api.Assertions.assertFalse(
+                messageRepository.findById(message.getId()).isPresent()
+        );
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenUserDeletesOtherUsersPrivateMessage() throws Exception {
+        String janekToken = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        String adamToken = registerAndLogin("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        User janek = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = userRepository.findByLogin("adam123").orElseThrow();
+
+        Conversation conversation = createPrivateConversation(janek, adam);
+
+        Message message = new Message();
+        message.setConversationId(conversation.getId());
+        message.setSenderId(adam.getId());
+        message.setContent("Adam message");
+        message.setCreatedAt(Instant.now());
+        message.setEdited(false);
+        message.setEditedAt(null);
+        message = messageRepository.save(message);
+
+        mockMvc.perform(delete("/api/messages/" + message.getId())
+                        .header("Authorization", "Bearer " + janekToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldAllowGroupOwnerToDeleteOtherUsersMessageInGroup() throws Exception {
+        String ownerToken = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        String adamToken = registerAndLogin("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = userRepository.findByLogin("adam123").orElseThrow();
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia),
+                "Projekt ATI"
+        );
+
+        Message message = new Message();
+        message.setConversationId(conversation.getId());
+        message.setSenderId(adam.getId());
+        message.setContent("Owner can delete this");
+        message.setCreatedAt(Instant.now());
+        message.setEdited(false);
+        message.setEditedAt(null);
+        message = messageRepository.save(message);
+
+        mockMvc.perform(delete("/api/messages/" + message.getId())
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk());
+
+        org.junit.jupiter.api.Assertions.assertFalse(
+                messageRepository.findById(message.getId()).isPresent()
+        );
+    }
+
+    @Test
+    void shouldNotReturnExpiredMessagesInConversationHistory() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        User janek = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        Conversation conversation = createPrivateConversation(janek, adam);
+
+        Message expiredMessage = new Message();
+        expiredMessage.setConversationId(conversation.getId());
+        expiredMessage.setSenderId(janek.getId());
+        expiredMessage.setContent("Expired message");
+        expiredMessage.setCreatedAt(Instant.now().minusSeconds(30));
+        expiredMessage.setEdited(false);
+        expiredMessage.setEditedAt(null);
+        expiredMessage.setDisappearing(true);
+        expiredMessage.setExpiresAt(Instant.now().minusSeconds(5));
+        messageRepository.save(expiredMessage);
+
+        Message activeMessage = new Message();
+        activeMessage.setConversationId(conversation.getId());
+        activeMessage.setSenderId(adam.getId());
+        activeMessage.setContent("Active message");
+        activeMessage.setCreatedAt(Instant.now());
+        activeMessage.setEdited(false);
+        activeMessage.setEditedAt(null);
+        activeMessage.setDisappearing(false);
+        activeMessage.setExpiresAt(null);
+        messageRepository.save(activeMessage);
+
+        mockMvc.perform(get("/api/conversations/{conversationId}/messages", conversation.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].content").value("Active message"));
     }
 }

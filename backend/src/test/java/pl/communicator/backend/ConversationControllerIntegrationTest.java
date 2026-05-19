@@ -24,6 +24,8 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.empty;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -94,6 +96,20 @@ class ConversationControllerIntegrationTest {
         user.setRole(Role.USER);
         user.setAvatarUrl(null);
         return userRepository.save(user);
+    }
+
+    private Conversation createGroupConversation(User owner, List<User> participants, String name) {
+        Conversation conversation = new Conversation();
+        conversation.setType(ConversationType.GROUP);
+        conversation.setName(name);
+        conversation.setOwnerId(owner.getId());
+        conversation.setParticipantIds(participants.stream().map(User::getId).toList());
+        conversation.setCreatedBy(owner.getId());
+        conversation.setCreatedAt(Instant.now());
+        conversation.setLastActivityAt(conversation.getCreatedAt());
+        conversation.setLastMessageId(null);
+
+        return conversationRepository.save(conversation);
     }
 
     @Test
@@ -349,5 +365,371 @@ class ConversationControllerIntegrationTest {
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].id").value(newerConversation.getId()))
                 .andExpect(jsonPath("$[1].id").value(olderConversation.getId()));
+    }
+
+    @Test
+    void shouldCreateGroupConversationSuccessfully() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Map<String, Object> request = Map.of(
+                "name", "Projekt ATI",
+                "participantIds", List.of(adam.getId(), kasia.getId())
+        );
+
+        mockMvc.perform(post("/api/conversations/group")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("GROUP"))
+                .andExpect(jsonPath("$.name").value("Projekt ATI"))
+                .andExpect(jsonPath("$.participants", hasSize(3)))
+                .andExpect(jsonPath("$.ownerId").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenGroupHasLessThanThreeParticipants() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        Map<String, Object> request = Map.of(
+                "name", "Za mała grupa",
+                "participantIds", List.of(adam.getId())
+        );
+
+        mockMvc.perform(post("/api/conversations/group")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldUpdateGroupNameSuccessfully() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia),
+                "Stara nazwa"
+        );
+
+        Map<String, String> request = Map.of(
+                "name", "Nowa nazwa grupy"
+        );
+
+        mockMvc.perform(put("/api/conversations/" + conversation.getId() + "/group/name")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Nowa nazwa grupy"))
+                .andExpect(jsonPath("$.type").value("GROUP"));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenNonOwnerUpdatesGroupName() throws Exception {
+        String ownerToken = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        String memberToken = registerAndLogin("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User member = userRepository.findByLogin("adam123").orElseThrow();
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, member, kasia),
+                "Stara nazwa"
+        );
+
+        Map<String, String> request = Map.of(
+                "name", "Nielegalna zmiana"
+        );
+
+        mockMvc.perform(put("/api/conversations/" + conversation.getId() + "/group/name")
+                        .header("Authorization", "Bearer " + memberToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldAddParticipantToGroupSuccessfully() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+        User ola = createUser("ola@test.pl", "ola123", "Ola", "haslo999");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia),
+                "Projekt ATI"
+        );
+
+        Map<String, String> request = Map.of(
+                "userId", ola.getId()
+        );
+
+        mockMvc.perform(post("/api/conversations/" + conversation.getId() + "/group/participants")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participants", hasSize(4)))
+                .andExpect(jsonPath("$.participants[*].login")
+                        .value(org.hamcrest.Matchers.containsInAnyOrder("janek123", "adam123", "kasia123", "ola123")));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenAddingExistingParticipantToGroup() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia),
+                "Projekt ATI"
+        );
+
+        Map<String, String> request = Map.of(
+                "userId", adam.getId()
+        );
+
+        mockMvc.perform(post("/api/conversations/" + conversation.getId() + "/group/participants")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRemoveParticipantFromGroupSuccessfully() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+        User ola = createUser("ola@test.pl", "ola123", "Ola", "haslo999");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia, ola),
+                "Projekt ATI"
+        );
+
+        Map<String, String> request = Map.of(
+                "userId", ola.getId()
+        );
+
+        mockMvc.perform(delete("/api/conversations/" + conversation.getId() + "/group/participants")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participants", hasSize(3)))
+                .andExpect(jsonPath("$.participants[*].login")
+                        .value(org.hamcrest.Matchers.containsInAnyOrder("janek123", "adam123", "kasia123")));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenOwnerTriesToRemoveSelf() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+        User ola = createUser("ola@test.pl", "ola123", "Ola", "haslo999");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia, ola),
+                "Projekt ATI"
+        );
+
+        Map<String, String> request = Map.of(
+                "userId", owner.getId()
+        );
+
+        mockMvc.perform(delete("/api/conversations/" + conversation.getId() + "/group/participants")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenRemovingParticipantWouldBreakMinimumGroupSize() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia),
+                "Projekt ATI"
+        );
+
+        Map<String, String> request = Map.of(
+                "userId", adam.getId()
+        );
+
+        mockMvc.perform(delete("/api/conversations/" + conversation.getId() + "/group/participants")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldLeaveGroupSuccessfullyForNonOwner() throws Exception {
+        String ownerToken = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        String memberToken = registerAndLogin("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User member = userRepository.findByLogin("adam123").orElseThrow();
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, member, kasia),
+                "Projekt ATI"
+        );
+
+        mockMvc.perform(post("/api/conversations/" + conversation.getId() + "/group/leave")
+                        .header("Authorization", "Bearer " + memberToken))
+                .andExpect(status().isOk());
+
+        Conversation updatedConversation = conversationRepository.findById(conversation.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(2, updatedConversation.getParticipantIds().size());
+        org.junit.jupiter.api.Assertions.assertFalse(updatedConversation.getParticipantIds().contains(member.getId()));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenOwnerTriesToLeaveGroupWithoutTransfer() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia),
+                "Projekt ATI"
+        );
+
+        mockMvc.perform(post("/api/conversations/" + conversation.getId() + "/group/leave")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldTransferGroupOwnershipSuccessfully() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia),
+                "Projekt ATI"
+        );
+
+        Map<String, String> request = Map.of(
+                "newOwnerId", adam.getId()
+        );
+
+        mockMvc.perform(put("/api/conversations/" + conversation.getId() + "/group/owner")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownerId").value(adam.getId()));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenNewOwnerIsNotParticipant() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+        User outsider = createUser("ola@test.pl", "ola123", "Ola", "haslo999");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia),
+                "Projekt ATI"
+        );
+
+        Map<String, String> request = Map.of(
+                "newOwnerId", outsider.getId()
+        );
+
+        mockMvc.perform(put("/api/conversations/" + conversation.getId() + "/group/owner")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldDeleteGroupSuccessfullyForOwner() throws Exception {
+        String token = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User adam = createUser("adam@test.pl", "adam123", "Adam", "haslo456");
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, adam, kasia),
+                "Projekt ATI"
+        );
+
+        mockMvc.perform(delete("/api/conversations/" + conversation.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        org.junit.jupiter.api.Assertions.assertFalse(
+                conversationRepository.findById(conversation.getId()).isPresent()
+        );
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenNonOwnerDeletesGroup() throws Exception {
+        String ownerToken = registerAndLogin("janek@test.pl", "janek123", "Janek", "haslo123");
+        String memberToken = registerAndLogin("adam@test.pl", "adam123", "Adam", "haslo456");
+
+        User owner = userRepository.findByLogin("janek123").orElseThrow();
+        User member = userRepository.findByLogin("adam123").orElseThrow();
+        User kasia = createUser("kasia@test.pl", "kasia123", "Kasia", "haslo789");
+
+        Conversation conversation = createGroupConversation(
+                owner,
+                List.of(owner, member, kasia),
+                "Projekt ATI"
+        );
+
+        mockMvc.perform(delete("/api/conversations/" + conversation.getId())
+                        .header("Authorization", "Bearer " + memberToken))
+                .andExpect(status().isBadRequest());
     }
 }
