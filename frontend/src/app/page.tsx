@@ -1,35 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { StompSubscription } from "@stomp/stompjs";
+import { useCallback, useEffect, useState } from "react";
 import AuthForm from "@/components/AuthForm";
 import ChatLayout from "@/components/ChatLayout";
 import {
-  addParticipantToGroup,
   changePassword,
-  createGroupConversation,
-  createPrivateConversation,
-  deleteGroup,
   getCurrentUser,
-  getMyConversations,
-  leaveGroup,
   loginUser,
   registerUser,
-  removeParticipantFromGroup,
-  searchUsers,
-  transferGroupOwnership,
-  updateGroupName,
   updateProfile,
 } from "@/lib/api";
-import { ConversationResponse } from "@/types/conversation";
-import { UserSearchResponse, UserResponse } from "@/types/user";
-import {
-  connectStompClient,
-  disconnectStompClient,
-  subscribeToConversationDeleted,
-  subscribeToConversationManagementUpdates,
-  subscribeToConversationUpdates,
-} from "@/lib/websocket";
+import { UserResponse } from "@/types/user";
+import { useConversations } from "@/hooks/useConversations";
+import { useUserWebSocket } from "@/hooks/useUserWebSocket";
 
 type AuthMode = "login" | "register";
 
@@ -44,76 +27,48 @@ export default function HomePage() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
-  const [searchResults, setSearchResults] = useState<UserSearchResponse[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [conversations, setConversations] = useState<ConversationResponse[]>(
-    [],
-  );
-  const [selectedConversation, setSelectedConversation] =
-    useState<ConversationResponse | null>(null);
 
-  const conversationUpdatesSubscriptionRef = useRef<StompSubscription | null>(
-    null,
-  );
-  const conversationManagementSubscriptionRef =
-    useRef<StompSubscription | null>(null);
-  const conversationDeletedSubscriptionRef = useRef<StompSubscription | null>(
-    null,
-  );
+  const {
+    searchResults,
+    searchLoading,
+    conversations,
+    selectedConversation,
+    setConversations,
+    setSelectedConversation,
+    setSearchResults,
+    loadConversations,
+    refreshConversations,
+    handleSearchUsers,
+    handleStartConversation,
+    handleCreateGroup,
+    handleUpdateGroupName,
+    handleAddParticipant,
+    handleRemoveParticipant,
+    handleLeaveGroup,
+    handleTransferOwnership,
+    handleDeleteGroup,
+  } = useConversations({
+    setMessage,
+    onCloseManageGroup: () => setIsManageGroupOpen(false),
+    onCloseCreateGroup: () => setIsCreateGroupOpen(false),
+  });
 
-  const selectedConversationIdRef = useRef<string | null>(null);
+  const handleCloseCreateGroup = useCallback(() => {
+    setIsCreateGroupOpen(false);
+    setSearchResults([]);
+  }, [setSearchResults]);
 
-  useEffect(() => {
-    selectedConversationIdRef.current = selectedConversation?.id ?? null;
-  }, [selectedConversation?.id]);
+  const closeManageGroup = useCallback(() => {
+    setIsManageGroupOpen(false);
+  }, []);
 
-  const loadConversations = useCallback(
-    async (token: string, preferredConversationId?: string) => {
-      const data = await getMyConversations(token);
-      setConversations(data);
-
-      if (data.length === 0) {
-        setSelectedConversation(null);
-        return;
-      }
-
-      const targetId =
-        preferredConversationId ?? selectedConversationIdRef.current;
-
-      const matchedConversation = data.find((item) => item.id === targetId);
-
-      if (matchedConversation) {
-        setSelectedConversation(matchedConversation);
-      } else {
-        setSelectedConversation(data[0]);
-      }
-    },
-    [],
-  );
-
-  const refreshConversations = useCallback(async () => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    await loadConversations(token);
-  }, [loadConversations]);
-
-  const clearUserSubscriptions = () => {
-    if (conversationUpdatesSubscriptionRef.current) {
-      conversationUpdatesSubscriptionRef.current.unsubscribe();
-      conversationUpdatesSubscriptionRef.current = null;
-    }
-
-    if (conversationManagementSubscriptionRef.current) {
-      conversationManagementSubscriptionRef.current.unsubscribe();
-      conversationManagementSubscriptionRef.current = null;
-    }
-
-    if (conversationDeletedSubscriptionRef.current) {
-      conversationDeletedSubscriptionRef.current.unsubscribe();
-      conversationDeletedSubscriptionRef.current = null;
-    }
-  };
+  const { clearUserSubscriptions } = useUserWebSocket({
+    currentUser,
+    refreshConversations,
+    setConversations,
+    setSelectedConversation,
+    closeManageGroup,
+  });
 
   const fetchCurrentUser = useCallback(
     async (token: string) => {
@@ -125,50 +80,6 @@ export default function HomePage() {
 
         await loadConversations(token);
         setMessage("");
-
-        connectStompClient(
-          async () => {
-            console.log("WebSocket connected");
-
-            clearUserSubscriptions();
-
-            const updatesSubscription = await subscribeToConversationUpdates(
-              user.id,
-              () => {
-                void refreshConversations();
-              },
-            );
-            conversationUpdatesSubscriptionRef.current = updatesSubscription;
-
-            const managementSubscription =
-              await subscribeToConversationManagementUpdates(user.id, () => {
-                void refreshConversations();
-              });
-            conversationManagementSubscriptionRef.current =
-              managementSubscription;
-
-            const deletedSubscription = await subscribeToConversationDeleted(
-              user.id,
-              (event) => {
-                setConversations((prev) =>
-                  prev.filter(
-                    (conversation) => conversation.id !== event.conversationId,
-                  ),
-                );
-
-                setSelectedConversation((prev) =>
-                  prev?.id === event.conversationId ? null : prev,
-                );
-
-                setIsManageGroupOpen(false);
-              },
-            );
-            conversationDeletedSubscriptionRef.current = deletedSubscription;
-          },
-          (error) => {
-            console.error(error);
-          },
-        );
       } catch (error) {
         localStorage.removeItem("token");
         clearUserSubscriptions();
@@ -182,7 +93,12 @@ export default function HomePage() {
         setLoadingUser(false);
       }
     },
-    [loadConversations, refreshConversations],
+    [
+      loadConversations,
+      clearUserSubscriptions,
+      setConversations,
+      setSelectedConversation,
+    ],
   );
 
   const handleLogin = async (payload: { login: string; password: string }) => {
@@ -262,186 +178,9 @@ export default function HomePage() {
     }
   };
 
-  const handleCloseCreateGroup = () => {
-    setIsCreateGroupOpen(false);
-    setSearchResults([]);
-  };
-
-  const handleSearchUsers = async (query: string) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      setSearchLoading(true);
-      setMessage("");
-
-      const users = await searchUsers(token, query);
-      setSearchResults(users);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Search failed");
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const handleStartConversation = async (userId: string) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      setMessage("");
-
-      const conversation = await createPrivateConversation(token, userId);
-      await loadConversations(token, conversation.id);
-      setSearchResults([]);
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Could not create conversation",
-      );
-    }
-  };
-
-  const handleCreateGroup = async (payload: {
-    name: string;
-    participantIds: string[];
-  }) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      setMessage("");
-
-      const conversation = await createGroupConversation(token, payload);
-      await loadConversations(token, conversation.id);
-      setSearchResults([]);
-      setIsCreateGroupOpen(false);
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Could not create group",
-      );
-    }
-  };
-
-  const handleUpdateGroupName = async (
-    conversationId: string,
-    name: string,
-  ) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      setMessage("");
-      await updateGroupName(token, conversationId, name);
-      await loadConversations(token, conversationId);
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Could not update group name",
-      );
-    }
-  };
-
-  const handleAddParticipant = async (
-    conversationId: string,
-    userId: string,
-  ) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      setMessage("");
-      await addParticipantToGroup(token, conversationId, userId);
-      await loadConversations(token, conversationId);
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Could not add participant",
-      );
-    }
-  };
-
-  const handleRemoveParticipant = async (
-    conversationId: string,
-    userId: string,
-  ) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      setMessage("");
-      await removeParticipantFromGroup(token, conversationId, userId);
-      await loadConversations(token, conversationId);
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Could not remove participant",
-      );
-    }
-  };
-
-  const handleLeaveGroup = async (conversationId: string) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      setMessage("");
-      await leaveGroup(token, conversationId);
-
-      if (selectedConversation?.id === conversationId) {
-        setSelectedConversation(null);
-        setIsManageGroupOpen(false);
-      }
-
-      await loadConversations(token);
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Could not leave group",
-      );
-    }
-  };
-
-  const handleTransferOwnership = async (
-    conversationId: string,
-    newOwnerId: string,
-  ) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      setMessage("");
-      await transferGroupOwnership(token, conversationId, newOwnerId);
-      await loadConversations(token, conversationId);
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Could not transfer ownership",
-      );
-    }
-  };
-
-  const handleDeleteGroup = async (conversationId: string) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      setMessage("");
-      await deleteGroup(token, conversationId);
-
-      if (selectedConversation?.id === conversationId) {
-        setSelectedConversation(null);
-        setIsManageGroupOpen(false);
-      }
-
-      await loadConversations(token);
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Could not delete group",
-      );
-    }
-  };
-
   const handleLogout = () => {
     clearUserSubscriptions();
     localStorage.removeItem("token");
-    disconnectStompClient();
 
     setCurrentUser(null);
     setSearchResults([]);
@@ -463,11 +202,6 @@ export default function HomePage() {
     }
 
     void fetchCurrentUser(savedToken);
-
-    return () => {
-      clearUserSubscriptions();
-      disconnectStompClient();
-    };
   }, [fetchCurrentUser]);
 
   useEffect(() => {
