@@ -6,13 +6,14 @@ import {
   ConversationUpdatedEvent,
   ConversationDeletedEvent,
 } from "@/types/conversation";
+import { WS_BASE_URL } from "@/lib/config";
 
 let stompClient: Client | null = null;
 let isDisconnecting = false;
 
 export function createStompClient() {
   return new Client({
-    webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+    webSocketFactory: () => new SockJS(`${WS_BASE_URL}/ws`),
     reconnectDelay: 5000,
     debug: () => {},
   });

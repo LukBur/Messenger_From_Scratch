@@ -7,8 +7,9 @@ import {
 import { UserSearchResponse, UserResponse } from "@/types/user";
 import { ConversationResponse } from "@/types/conversation";
 import { MessageResponse, SendMessageRequest } from "@/types/message";
+import { API_BASE_URL } from "@/lib/config";
 
-const API_URL = "http://localhost:8080/api";
+const API_URL = `${API_BASE_URL}/api`;
 
 async function handleJsonResponse<T>(response: Response): Promise<T> {
   const data = await response.json().catch(() => null);
