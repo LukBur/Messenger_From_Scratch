@@ -20,6 +20,7 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    // Returns profile data for the currently authenticated user.
     public UserResponse getCurrentUser(String currentLogin) {
         User user = userRepository.findByLogin(currentLogin)
                 .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
@@ -37,6 +38,8 @@ public class UserService {
         }
 
         String avatarUrl = request.getAvatarUrl();
+
+        // Blank avatar URLs are stored as null to avoid keeping meaningless values.
         if (avatarUrl != null) {
             avatarUrl = avatarUrl.trim();
             if (avatarUrl.isEmpty()) {
@@ -55,6 +58,7 @@ public class UserService {
         User user = userRepository.findByLogin(currentLogin)
                 .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
 
+        // The current password must be verified before allowing the user to change it.
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new IllegalArgumentException("Current password is incorrect");
         }
@@ -69,10 +73,12 @@ public class UserService {
             throw new IllegalArgumentException("New password must be different from the current password");
         }
 
+        // The new password is encoded before saving, so the raw password is never stored.
         user.setPassword(passwordEncoder.encode(trimmedNewPassword));
         userRepository.save(user);
     }
 
+    // Converts the user entity into a response object without exposing the password hash.
     private UserResponse mapToResponse(User user) {
         return new UserResponse(
                 user.getId(),

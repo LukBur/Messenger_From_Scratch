@@ -29,6 +29,7 @@ export default function ProfileModal({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
+  // Resets form fields whenever the modal is opened for the current user.
   useEffect(() => {
     if (!currentUser) return;
 
@@ -43,6 +44,8 @@ export default function ProfileModal({
 
     await onSave({
       displayName: displayName.trim(),
+      
+      // Empty avatar input is saved as null so the backend can treat it as no avatar.
       avatarUrl: avatarUrl.trim() ? avatarUrl.trim() : null,
     });
 

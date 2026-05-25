@@ -28,6 +28,7 @@ public class ConversationController {
         return conversationService.createOrGetPrivateConversation(authentication.getName(), request);
     }
 
+    // Creates a new group conversation with the authenticated user as its owner.
     @PostMapping("/group")
     public ConversationResponse createGroupConversation(
             @Valid @RequestBody CreateGroupConversationRequest request,
@@ -36,6 +37,7 @@ public class ConversationController {
         return conversationService.createGroupConversation(authentication.getName(), request);
     }
 
+    // Updates the group name if the authenticated user has permission to manage the group.
     @PutMapping("/{conversationId}/group/name")
     public ConversationResponse updateGroupName(
             @PathVariable String conversationId,
@@ -45,6 +47,7 @@ public class ConversationController {
         return conversationService.updateGroupName(authentication.getName(), conversationId, request);
     }
 
+    // Adds a new participant to an existing group conversation.
     @PostMapping("/{conversationId}/group/participants")
     public ConversationResponse addParticipantToGroup(
             @PathVariable String conversationId,
@@ -54,6 +57,7 @@ public class ConversationController {
         return conversationService.addParticipantToGroup(authentication.getName(), conversationId, request);
     }
 
+    // Removes a participant from a group conversation.
     @DeleteMapping("/{conversationId}/group/participants")
     public ConversationResponse removeParticipantFromGroup(
             @PathVariable String conversationId,
@@ -63,6 +67,7 @@ public class ConversationController {
         return conversationService.removeParticipantFromGroup(authentication.getName(), conversationId, request);
     }
 
+    // Allows the authenticated user to leave a group without deleting it for other participants.
     @PostMapping("/{conversationId}/group/leave")
     public void leaveGroup(
             @PathVariable String conversationId,
@@ -71,6 +76,7 @@ public class ConversationController {
         conversationService.leaveGroup(authentication.getName(), conversationId);
     }
 
+    // Transfers group ownership from the current owner to another participant.
     @PutMapping("/{conversationId}/group/owner")
     public ConversationResponse transferGroupOwnership(
             @PathVariable String conversationId,
@@ -80,6 +86,7 @@ public class ConversationController {
         return conversationService.transferGroupOwnership(authentication.getName(), conversationId, request);
     }
 
+    // Deletes the group conversation if the authenticated user is allowed to do so.
     @DeleteMapping("/{conversationId}")
     public void deleteGroup(
             @PathVariable String conversationId,

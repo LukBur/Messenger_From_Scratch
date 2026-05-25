@@ -36,9 +36,11 @@ public class Message {
     @Setter
     private Instant editedAt;
 
+    // Defines when the message should no longer be available.
     @Setter
     private Instant expiresAt;
 
+    // Indicates whether this message should disappear after its expiration time.
     @Setter
     private boolean disappearing;
 

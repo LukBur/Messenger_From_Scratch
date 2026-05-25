@@ -17,6 +17,7 @@ import { useUserWebSocket } from "@/hooks/useUserWebSocket";
 type AuthMode = "login" | "register";
 
 export default function HomePage() {
+  // Stores authentication mode and global UI feedback for login/register actions.
   const [mode, setMode] = useState<AuthMode>("login");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -70,6 +71,7 @@ export default function HomePage() {
     closeManageGroup,
   });
 
+  // Loads the authenticated user and their conversations using the stored JWT token.
   const fetchCurrentUser = useCallback(
     async (token: string) => {
       try {
@@ -178,6 +180,7 @@ export default function HomePage() {
     }
   };
 
+  // Clears local auth data and resets all user-specific UI state.
   const handleLogout = () => {
     clearUserSubscriptions();
     localStorage.removeItem("token");
@@ -193,6 +196,7 @@ export default function HomePage() {
     setMode("login");
   };
 
+  // Restores the session after page refresh if a token is still available.
   useEffect(() => {
     const savedToken = localStorage.getItem("token");
 
@@ -204,6 +208,7 @@ export default function HomePage() {
     void fetchCurrentUser(savedToken);
   }, [fetchCurrentUser]);
 
+  // Periodically refreshes conversations as a fallback in case a WebSocket update is missed.
   useEffect(() => {
     if (!currentUser) return;
 

@@ -83,11 +83,13 @@ public class ConversationService {
                 savedConversation.getName()
         );
 
+        // The leaving user gets a separate event so the frontend can remove the conversation locally.
         messagingTemplate.convertAndSend(
                 "/topic/users/" + currentUser.getId() + "/conversations",
                 event
         );
 
+        // The leaving user gets a separate event so the frontend can remove the conversation locally.
         messagingTemplate.convertAndSend(
                 "/topic/users/" + targetUser.getId() + "/conversations",
                 event
@@ -97,6 +99,7 @@ public class ConversationService {
         return mapToResponse(savedConversation);
     }
 
+    // Creates a group conversation, removes duplicate participant ids, and makes the creator the owner.
     public ConversationResponse createGroupConversation(
             String currentLogin,
             CreateGroupConversationRequest request
@@ -109,6 +112,7 @@ public class ConversationService {
             throw new IllegalArgumentException("Group name cannot be empty");
         }
 
+        // LinkedHashSet removes duplicates while keeping the original participant order.
         Set<String> uniqueParticipantIds = new LinkedHashSet<>(request.getParticipantIds());
         uniqueParticipantIds.add(currentUser.getId());
 
@@ -142,6 +146,7 @@ public class ConversationService {
         );
 
         for (User participant : participants) {
+            // The leaving user gets a separate event so the frontend can remove the conversation locally.
             messagingTemplate.convertAndSend(
                     "/topic/users/" + participant.getId() + "/conversations",
                     event
@@ -181,6 +186,7 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
+        // Only the group owner can rename the group.
         validateGroupOwnership(currentUser, conversation);
 
         String trimmedName = request.getName().trim();
@@ -207,6 +213,7 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
+        // Only the group owner can rename the group.
         validateGroupOwnership(currentUser, conversation);
 
         User userToAdd = userRepository.findById(request.getUserId())
@@ -235,6 +242,7 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
+        // Only the group owner can rename the group.
         validateGroupOwnership(currentUser, conversation);
 
         String userIdToRemove = request.getUserId();
@@ -268,6 +276,7 @@ public class ConversationService {
 
         validateGroupParticipation(currentUser, conversation);
 
+        // The owner cannot leave directly because the group must always have an owner.
         if (currentUser.getId().equals(conversation.getOwnerId())) {
             throw new IllegalArgumentException("Group owner must transfer ownership before leaving");
         }
@@ -278,6 +287,7 @@ public class ConversationService {
 
         sendConversationUpdatedEvent(updatedConversation);
 
+        // The leaving user gets a separate event so the frontend can remove the conversation locally.
         messagingTemplate.convertAndSend(
                 "/topic/users/" + currentUser.getId() + "/conversation-deleted",
                 new ConversationDeletedEvent(conversationId)
@@ -295,10 +305,12 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
+        // Only the group owner can rename the group.
         validateGroupOwnership(currentUser, conversation);
 
         String newOwnerId = request.getNewOwnerId();
 
+        // Ownership can only be transferred to an existing group participant.
         if (!conversation.getParticipantIds().contains(newOwnerId)) {
             throw new IllegalArgumentException("New owner must be a participant of the group");
         }
@@ -322,9 +334,12 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
+        // Only the group owner can rename the group.
         validateGroupOwnership(currentUser, conversation);
 
+        // Participants are notified before the conversation and its messages are removed.
         for (String participantId : conversation.getParticipantIds()) {
+            // The leaving user gets a separate event so the frontend can remove the conversation locally.
             messagingTemplate.convertAndSend(
                     "/topic/users/" + participantId + "/conversation-deleted",
                     new ConversationDeletedEvent(conversation.getId())
@@ -335,6 +350,7 @@ public class ConversationService {
         conversationRepository.delete(conversation);
     }
 
+    // Ensures that group-only actions are not executed on private conversations.
     private void validateGroupParticipation(User currentUser, Conversation conversation) {
         if (conversation.getType() != ConversationType.GROUP) {
             throw new IllegalArgumentException("This operation is only allowed for group conversations");
@@ -345,6 +361,7 @@ public class ConversationService {
         }
     }
 
+    // Ensures that only the current group owner can perform management actions.
     private void validateGroupOwnership(User currentUser, Conversation conversation) {
         if (conversation.getType() != ConversationType.GROUP) {
             throw new IllegalArgumentException("This operation is only allowed for group conversations");
@@ -355,6 +372,7 @@ public class ConversationService {
         }
     }
 
+    // Sends a lightweight update event to every participant of the conversation.
     private void sendConversationUpdatedEvent(Conversation conversation) {
         ConversationUpdatedEvent event = new ConversationUpdatedEvent(
                 conversation.getId(),
@@ -362,7 +380,9 @@ public class ConversationService {
                 conversation.getName()
         );
 
+        // Participants are notified before the conversation and its messages are removed.
         for (String participantId : conversation.getParticipantIds()) {
+            // The leaving user gets a separate event so the frontend can remove the conversation locally.
             messagingTemplate.convertAndSend(
                     "/topic/users/" + participantId + "/conversation-updates",
                     event

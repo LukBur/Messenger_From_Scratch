@@ -78,7 +78,7 @@ export default function CreateGroupModal({
           </button>
         </div>
 
-        <div className="group-form" onSubmit={handleCreateGroup}>
+        <div className="group-form">
           <input
             type="text"
             placeholder="Group name"

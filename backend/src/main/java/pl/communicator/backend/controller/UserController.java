@@ -48,6 +48,7 @@ public class UserController {
         );
     }
 
+    // Updates editable profile fields for the currently authenticated user.
     @PutMapping("/me/profile")
     public UserResponse updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,
@@ -56,6 +57,7 @@ public class UserController {
         return userService.updateProfile(authentication.getName(), request);
     }
 
+    // Changes the current user's password after validating the provided credentials.
     @PutMapping("/me/password")
     public void changePassword(
             @Valid @RequestBody ChangePasswordRequest request,

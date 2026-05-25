@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MessageResponse } from "@/types/message";
 import { UserResponse } from "@/types/user";
+import { formatDate, getRemainingSeconds } from "@/utils/messageHelpers";
 
 type MessageListProps = {
   messages: MessageResponse[];
@@ -10,23 +11,6 @@ type MessageListProps = {
   onEditMessage: (messageId: string, content: string) => Promise<void>;
   onDeleteMessage: (messageId: string) => Promise<void>;
 };
-
-function formatDate(dateString: string) {
-  const date = new Date(dateString);
-  return date.toLocaleString();
-}
-
-function parseBackendDate(dateString: string): Date {
-  const timestamp = Date.parse(dateString);
-  return isNaN(timestamp) ? new Date() : new Date(timestamp);
-}
-
-function getRemainingSeconds(expiresAt: string | null) {
-  if (!expiresAt) return 0;
-
-  const diff = parseBackendDate(expiresAt).getTime() - Date.now();
-  return Math.max(Math.floor(diff / 1000), 0);
-}
 
 export default function MessageList({
   messages,
@@ -36,8 +20,11 @@ export default function MessageList({
 }: MessageListProps) {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState("");
+
+  // Used only to trigger rerenders for disappearing message countdown updates.
   const [tick, setTick] = useState(0);
 
+  // Starts a timer only when at least one disappearing message is visible.
   useEffect(() => {
     const hasDisappearingMessages = messages.some((msg) => msg.disappearing);
 
@@ -50,11 +37,13 @@ export default function MessageList({
     return () => clearInterval(interval);
   }, [messages]);
 
+  // Pre-fills the edit form with the current message content.
   const startEditing = (message: MessageResponse) => {
     setEditingMessageId(message.id);
     setEditedContent(message.content);
   };
 
+  // Clears edit mode state after saving or cancelling message edits.
   const cancelEditing = () => {
     setEditingMessageId(null);
     setEditedContent("");
@@ -73,6 +62,7 @@ export default function MessageList({
   const handleDelete = async (messageId: string) => {
     await onDeleteMessage(messageId);
 
+    // Prevents keeping edit mode open for messages that were deleted.
     if (editingMessageId === messageId) {
       cancelEditing();
     }
@@ -87,6 +77,8 @@ export default function MessageList({
       {messages.map((message) => {
         const isOwn = message.sender.id === currentUser.id;
         const isEditing = editingMessageId === message.id;
+
+        // Accessing tick forces the component to rerender every second for countdown updates.
         void tick;
 
         return (

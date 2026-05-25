@@ -36,6 +36,7 @@ public class MessageService {
     public MessageResponse sendMessage(String currentLogin, SendMessageRequest request) {
         Integer disappearAfterSeconds = request.getDisappearAfterSeconds();
 
+        // Disappearing messages receive an expiration timestamp based on the requested lifetime.
         boolean disappearing = disappearAfterSeconds != null
                 && disappearAfterSeconds > 0;
 
@@ -49,6 +50,7 @@ public class MessageService {
         Conversation conversation = conversationRepository.findById(request.getConversationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
+        // Only conversation participants are allowed to send messages to this conversation.
         if (!conversation.getParticipantIds().contains(currentUser.getId())) {
             throw new IllegalArgumentException("You are not a participant of this conversation");
         }
@@ -79,6 +81,7 @@ public class MessageService {
 
         MessageResponse response = mapToResponse(savedMessage);
 
+        // The new message is broadcast to all subscribed conversation clients in real time.
         messagingTemplate.convertAndSend(
                 "/topic/conversations/" + conversation.getId(),
                 response
@@ -98,6 +101,7 @@ public class MessageService {
             throw new IllegalArgumentException("You can only edit your own messages");
         }
 
+        // Expired disappearing messages cannot be edited anymore.
         if (isExpired(message)) {
             throw new IllegalArgumentException("Message has already expired");
         }
@@ -114,6 +118,7 @@ public class MessageService {
         Message updatedMessage = messageRepository.save(message);
         MessageResponse response = mapToResponse(updatedMessage);
 
+        // Updated message data is pushed to connected clients so edits appear instantly.
         messagingTemplate.convertAndSend(
                 "/topic/conversations/" + updatedMessage.getConversationId(),
                 response
@@ -133,6 +138,8 @@ public class MessageService {
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
         boolean isAuthor = message.getSenderId().equals(currentUser.getId());
+
+        // Group owners are allowed to remove messages from their own groups.
         boolean isGroupOwner = conversation.getType().name().equals("GROUP")
                 && currentUser.getId().equals(conversation.getOwnerId());
 
@@ -147,6 +154,7 @@ public class MessageService {
 
         updateConversationAfterMessageDeletion(conversationId, deletedMessageId);
 
+        // Connected clients are notified so the deleted message can be removed from the UI.
         messagingTemplate.convertAndSend(
                 "/topic/conversations/" + conversationId + "/deleted",
                 new MessageDeletedEvent(deletedMessageId, conversationId)
@@ -168,6 +176,7 @@ public class MessageService {
         List<Message> messages = messageRepository
                 .findByConversationIdOrderByCreatedAtAsc(conversationId);
 
+        // Expired disappearing messages are cleaned up before returning the conversation history.
         messages.stream()
                 .filter(this::isExpired)
                 .forEach(messageRepository::delete);
@@ -184,6 +193,7 @@ public class MessageService {
             return;
         }
 
+        // If the deleted message was the latest one, the conversation preview must be recalculated.
         if (deletedMessageId.equals(conversation.getLastMessageId())) {
             List<Message> remainingMessages =
                     messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
@@ -226,6 +236,7 @@ public class MessageService {
         );
     }
 
+    // Determines whether a disappearing message should already be treated as expired.
     private boolean isExpired(Message message) {
         return message.isDisappearing()
                 && message.getExpiresAt() != null

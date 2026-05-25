@@ -3,10 +3,10 @@
 import { FormEvent, useState } from "react";
 
 type MessageComposerProps = {
-    onSendMessage: (
-        content: string,
-        disappearAfterSeconds?: number
-    ) => Promise<void>;
+  onSendMessage: (
+    content: string,
+    disappearAfterSeconds?: number,
+  ) => Promise<void>;
   loading: boolean;
 };
 
@@ -15,19 +15,19 @@ export default function MessageComposer({
   loading,
 }: MessageComposerProps) {
   const [content, setContent] = useState("");
-    const [disappearAfterSeconds, setDisappearAfterSeconds] = useState(0);
+  const [disappearAfterSeconds, setDisappearAfterSeconds] = useState(0);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     const trimmed = content.trim();
     if (!trimmed) return;
 
-      await onSendMessage(
-          trimmed,
-          disappearAfterSeconds > 0
-              ? disappearAfterSeconds
-              : undefined
-      );
+    await onSendMessage(
+      trimmed,
+      disappearAfterSeconds > 0 ? disappearAfterSeconds : undefined,
+    );
+
     setContent("");
   };
 

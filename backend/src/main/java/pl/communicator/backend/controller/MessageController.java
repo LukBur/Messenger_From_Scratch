@@ -29,6 +29,7 @@ public class MessageController {
         return messageService.sendMessage(authentication.getName(), request);
     }
 
+    // Updates an existing message if it belongs to the authenticated user.
     @PutMapping("/messages/{messageId}")
     public MessageResponse editMessage(
             @PathVariable String messageId,
@@ -38,6 +39,7 @@ public class MessageController {
         return messageService.editMessage(authentication.getName(), messageId, request);
     }
 
+    // Deletes an existing message if the authenticated user is allowed to remove it.
     @DeleteMapping("/messages/{messageId}")
     public void deleteMessage(
             @PathVariable String messageId,

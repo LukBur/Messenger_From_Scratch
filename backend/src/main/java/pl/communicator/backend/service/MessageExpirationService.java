@@ -27,6 +27,7 @@ public class MessageExpirationService {
         this.messagingTemplate = messagingTemplate;
     }
 
+    // Runs periodically to remove disappearing messages after their expiration time.
     @Scheduled(fixedRate = 1000)
     public void removeExpiredMessages() {
         List<Message> expiredMessages =
@@ -40,6 +41,7 @@ public class MessageExpirationService {
 
             updateConversationAfterMessageDeletion(conversationId, deletedMessageId);
 
+            // Notify clients so the deleted message can be removed from the conversation view in real time.
             messagingTemplate.convertAndSend(
                     "/topic/conversations/" + conversationId + "/deleted",
                     new MessageDeletedEvent(deletedMessageId, conversationId)
@@ -53,10 +55,12 @@ public class MessageExpirationService {
             return;
         }
 
+        // If the deleted message was the latest one, the conversation preview must point to the new latest message.
         if (deletedMessageId.equals(conversation.getLastMessageId())) {
             List<Message> remainingMessages =
                     messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
 
+            // When no messages are left, the conversation falls back to its creation time.
             if (remainingMessages.isEmpty()) {
                 conversation.setLastMessageId(null);
                 conversation.setLastActivityAt(conversation.getCreatedAt());

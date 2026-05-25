@@ -33,7 +33,7 @@ public class SecurityConfig {
                 // CSRF is disabled because the API uses JWT tokens and does not rely on server-side sessions.
                 .csrf(csrf -> csrf.disable())
 
-                // Authentication endpoints are public, while all other API endpoints require a valid token.
+                // Authentication endpoints and WebSocket handshake routes are public, while all other API endpoints require a valid token.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/test",
@@ -62,16 +62,21 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
+        // Only the local frontend and deployed client are allowed to access the API from a browser.
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "https://messengerfromscratch.vercel.app"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
+
+        // The Authorization header is exposed so the frontend can read token-related response headers if needed.
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+
+        // Apply the same CORS rules to every endpoint in the backend.
         source.registerCorsConfiguration("/**", configuration);
 
         return source;
@@ -79,6 +84,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
+        // BCrypt hashes passwords with a salt, making stored credentials safer than plain text or fast hashes.
         return new BCryptPasswordEncoder();
     }
 }

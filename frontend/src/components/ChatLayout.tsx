@@ -19,11 +19,16 @@ type ChatLayoutProps = {
     displayName: string;
     avatarUrl: string | null;
   }) => Promise<void>;
+  onChangePassword: (payload: {
+    currentPassword: string;
+    newPassword: string;
+  }) => Promise<void>;
 
   searchResults: UserSearchResponse[];
   searchLoading: boolean;
   conversations: ConversationResponse[];
   selectedConversation: ConversationResponse | null;
+
   isCreateGroupOpen: boolean;
   onOpenCreateGroup: () => void;
   onCloseCreateGroup: () => void;
@@ -45,19 +50,14 @@ type ChatLayoutProps = {
     conversationId: string,
     userId: string,
   ) => Promise<void>;
-
-  onChangePassword: (payload: {
-    currentPassword: string;
-    newPassword: string;
-  }) => Promise<void>;
-  onLogout: () => void;
-
   onLeaveGroup: (conversationId: string) => Promise<void>;
   onTransferOwnership: (
     conversationId: string,
     newOwnerId: string,
   ) => Promise<void>;
   onDeleteGroup: (conversationId: string) => Promise<void>;
+
+  onLogout: () => void;
 };
 
 export default function ChatLayout({
@@ -67,11 +67,13 @@ export default function ChatLayout({
   onOpenProfile,
   onCloseProfile,
   onSaveProfile,
+  onChangePassword,
 
   searchResults,
   searchLoading,
   conversations,
   selectedConversation,
+
   isCreateGroupOpen,
   onOpenCreateGroup,
   onCloseCreateGroup,
@@ -87,11 +89,11 @@ export default function ChatLayout({
   onUpdateGroupName,
   onAddParticipant,
   onRemoveParticipant,
-  onChangePassword,
-  onLogout,
   onLeaveGroup,
   onTransferOwnership,
   onDeleteGroup,
+
+  onLogout,
 }: ChatLayoutProps) {
   return (
     <>

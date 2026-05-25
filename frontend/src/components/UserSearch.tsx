@@ -51,6 +51,7 @@ export default function UserSearch({
               </div>
 
               <button
+                type="button"
                 className="secondary-button"
                 onClick={() => onStartConversation(user.id)}
               >

@@ -17,6 +17,10 @@ import {
 } from "@/lib/api";
 import MessageList from "@/components/MessageList";
 import MessageComposer from "@/components/MessageComposer";
+import {
+  getOtherParticipant,
+  mergeMessages,
+} from "@/utils/conversationHelpers";
 
 type ConversationViewProps = {
   conversation: ConversationResponse | null;
@@ -24,32 +28,6 @@ type ConversationViewProps = {
   onConversationUpdated: () => Promise<void>;
   onOpenManageGroup: () => void;
 };
-
-function getOtherParticipant(
-  conversation: ConversationResponse,
-  currentUser: UserResponse,
-) {
-  return (
-    conversation.participants.find(
-      (participant) => participant.id !== currentUser.id,
-    ) || conversation.participants[0]
-  );
-}
-
-function mergeMessages(
-  currentMessages: MessageResponse[],
-  incomingMessages: MessageResponse[],
-) {
-  const map = new Map<string, MessageResponse>();
-
-  [...currentMessages, ...incomingMessages].forEach((message) => {
-    map.set(message.id, message);
-  });
-
-  return Array.from(map.values()).sort((a, b) => {
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  });
-}
 
 export default function ConversationView({
   conversation,
@@ -62,12 +40,14 @@ export default function ConversationView({
   const [sendingMessage, setSendingMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Keeps active WebSocket subscriptions between renders so they can be cleaned up properly.
   const subscriptionRef = useRef<StompSubscription | null>(null);
   const deleteSubscriptionRef = useRef<StompSubscription | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const activeConversationId = conversation?.id ?? null;
 
+  // Loads conversation messages from the API with optional silent refresh mode.
   const loadMessages = async (
     conversationId: string,
     options?: { silent?: boolean },
@@ -113,6 +93,7 @@ export default function ConversationView({
         disappearAfterSeconds,
       });
 
+      // Immediately updates local state after the API confirms message creation.
       setMessages((prev) => mergeMessages(prev, [sentMessage]));
       await onConversationUpdated();
     } catch (error) {
@@ -165,6 +146,7 @@ export default function ConversationView({
     }
   };
 
+  // Resets local messages when switching between conversations.
   useEffect(() => {
     if (!conversation) {
       setMessages([]);
@@ -175,6 +157,7 @@ export default function ConversationView({
     void loadMessages(conversation.id);
   }, [conversation?.id]);
 
+  // Subscribes to real-time incoming messages for the selected conversation.
   useEffect(() => {
     if (!conversation) {
       return;
@@ -185,6 +168,7 @@ export default function ConversationView({
       subscriptionRef.current = null;
     }
 
+    // Prevents assigning subscriptions after the effect has already been cleaned up.
     let isCancelled = false;
 
     const setupSubscription = async () => {
@@ -215,6 +199,7 @@ export default function ConversationView({
     };
   }, [conversation?.id, onConversationUpdated]);
 
+  // Subscribes to real-time message deletion events.
   useEffect(() => {
     if (!conversation) {
       return;
@@ -258,6 +243,7 @@ export default function ConversationView({
     };
   }, [conversation?.id, onConversationUpdated]);
 
+  // Periodic refresh acts as a fallback in case a WebSocket event is missed.
   useEffect(() => {
     if (!activeConversationId) return;
 
@@ -268,6 +254,7 @@ export default function ConversationView({
     return () => clearInterval(interval);
   }, [activeConversationId]);
 
+  // Automatically scrolls to the newest message whenever the message list changes.
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;

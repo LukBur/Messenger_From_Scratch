@@ -46,22 +46,28 @@ export default function ManageGroupModal({
   const [selectedNewOwnerId, setSelectedNewOwnerId] = useState("");
 
   const isGroup = conversation?.type === "GROUP";
+
+  // Determines whether the current user is allowed to manage the group.
   const isOwner = conversation?.ownerId === currentUser.id;
 
+  // Resets local modal state whenever a different conversation is opened.
   useEffect(() => {
     setGroupName(conversation?.name || "");
     setSelectedNewOwnerId("");
   }, [conversation]);
 
+  // Cached set used for fast participant existence checks during user search filtering.
   const participantIds = useMemo(
     () => new Set(conversation?.participants.map((p) => p.id) || []),
     [conversation],
   );
 
+  // Excludes users that already belong to the group.
   const searchableUsers = useMemo(() => {
     return searchResults.filter((user) => !participantIds.has(user.id));
   }, [searchResults, participantIds]);
 
+  // The current owner cannot transfer ownership to themselves.
   const transferableParticipants = useMemo(() => {
     return (
       conversation?.participants.filter(
@@ -92,12 +98,14 @@ export default function ManageGroupModal({
     setSelectedNewOwnerId("");
   };
 
+  // Closing the modal after leaving prevents showing controls for a group the user no longer belongs to.
   const handleLeaveGroup = async () => {
     await onLeaveGroup(conversation.id);
     onClose();
   };
 
   const handleDeleteGroup = async () => {
+    // Extra confirmation helps prevent accidental permanent group deletion.
     const confirmed = window.confirm(
       "Are you sure you want to delete this group?",
     );
@@ -129,6 +137,8 @@ export default function ManageGroupModal({
             {conversation.participants.map((participant) => {
               const isParticipantOwner =
                 participant.id === conversation.ownerId;
+
+              // Owners cannot be removed, and groups must keep at least 3 participants.
               const canRemove =
                 isOwner &&
                 participant.id !== conversation.ownerId &&

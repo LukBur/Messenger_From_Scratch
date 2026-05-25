@@ -2,6 +2,7 @@
 
 import { ConversationResponse } from "@/types/conversation";
 import { UserResponse } from "@/types/user";
+import { getOtherParticipant } from "@/utils/conversationHelpers";
 
 type ConversationListProps = {
   conversations: ConversationResponse[];
@@ -18,10 +19,7 @@ function getConversationTitle(
     return conversation.name || "Group conversation";
   }
 
-  const otherParticipant =
-    conversation.participants.find(
-      (participant) => participant.id !== currentUser.id,
-    ) || conversation.participants[0];
+  const otherParticipant = getOtherParticipant(conversation, currentUser);
 
   return otherParticipant?.displayName || "Conversation";
 }
@@ -34,10 +32,7 @@ function getConversationSubtitle(
     return `${conversation.participants.length} members`;
   }
 
-  const otherParticipant =
-    conversation.participants.find(
-      (participant) => participant.id !== currentUser.id,
-    ) || conversation.participants[0];
+  const otherParticipant = getOtherParticipant(conversation, currentUser);
 
   return otherParticipant ? `@${otherParticipant.login}` : "";
 }
@@ -50,10 +45,7 @@ function getConversationAvatar(
     return null;
   }
 
-  const otherParticipant =
-    conversation.participants.find(
-      (participant) => participant.id !== currentUser.id,
-    ) || conversation.participants[0];
+  const otherParticipant = getOtherParticipant(conversation, currentUser);
 
   return otherParticipant?.avatarUrl || null;
 }
